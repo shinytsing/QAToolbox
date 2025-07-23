@@ -1,0 +1,245 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}热爱可抵岁月漫长{% endblock %}</title>
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:400,700&display=swap">
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            font-family: 'Roboto', sans-serif;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .video-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -1;
+        }
+        video {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: cover;
+        }
+        header {
+            background: rgba(0, 0, 0, 0.8);
+            transition: background 0.3s;
+            z-index: 2;
+        }
+        .navbar a {
+            color: #fff !important;
+            transition: color 0.3s;
+        }
+        .navbar a:hover {
+            color: #FFD700 !important;
+        }
+        .nav-buttons {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+        }
+        .container {
+            padding: 0;
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+            min-height: calc(100vh - 120px);
+        }
+        footer {
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 20px 0;
+            text-align: center;
+            width: 100%;
+        }
+        .content-block {
+            background: transparent;
+            border-radius: 0;
+            padding: 0;
+            box-shadow: none;
+            backdrop-filter: none;
+            width: 100%;
+            position: relative;
+            z-index: 1;
+        }
+        .welcome-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+            pointer-events: none; /* 允许点击透过 */
+        }
+        .welcome-overlay.active {
+            opacity: 1;
+            pointer-events: auto; /* 允许点击 */
+        }
+        .welcome-content {
+            text-align: center;
+            color: #fff;
+        }
+        .welcome-content h1 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+        .welcome-content p {
+            font-size: 1.5rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="video-background">
+        <video id="background-video" autoplay muted loop preload="metadata">
+            <source id="video-source" src="" type="video/mp4">
+            您的浏览器不支持视频标签。
+        </video>
+        <audio id="background-audio" autoplay loop>
+            <source id="audio-source" src="" type="audio/mpeg">
+            您的浏览器不支持音频标签。
+        </audio>
+    </div>
+
+    <!-- 仅在 home 页显示欢迎界面 -->
+    {% if request.path == '/' %}
+    <div class="welcome-overlay" id="welcome-overlay">
+        <div class="welcome-content">
+            <h1>欢迎来到</h1>
+            <p>热爱可抵岁月漫长</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-light">
+            <a class="navbar-brand" href="{% url 'home' %}">热爱可抵岁月漫长</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav">
+                    <li class="nav-item"><a class="nav-link" href="{% url 'tools' %}">工具页</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'about' %}">关于我</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'contact' %}">联系我</a></li>
+                </ul>
+
+                <div class="nav-buttons">
+                    {% if user.is_authenticated %}
+                        <span class="nav-link text-white">欢迎, {{ user.username }}!</span>
+                        <a href="{% url 'logout' %}" class="nav-link" onclick="stopMedia()">登出</a>
+                    {% else %}
+                        <a href="{% url 'login' %}" class="btn btn-primary btn-custom" onclick="stopMedia()">登录</a>
+                        <a href="{% url 'register' %}" class="btn btn-secondary btn-custom" onclick="stopMedia()">注册</a>
+                    {% endif %}
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div class="content-block">
+            {% block content %}
+            <!-- 容器内容区 -->
+            {% endblock %}
+        </div>
+    </div>
+
+    <footer>
+        <p>版权所有 &copy; {{ current_year }} 热爱可抵岁月漫长.cn</p>
+        <p>社交媒体链接:
+            <a href="#" class="text-white"><i class="fab fa-facebook-f"></i></a>
+            <a href="#" class="text-white"><i class="fab fa-twitter"></i></a>
+            <a href="#" class="text-white"><i class="fab fa-instagram"></i></a>
+        </p>
+    </footer>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.min.js"></script>
+
+    <script>
+        window.onload = function () {
+            var today = new Date();
+            var day = today.getDay();
+
+            var videoSources = [
+                '{% static "video/sunday.mp4" %}',
+                '{% static "video/monday.mp4" %}',
+                '{% static "video/tuesday.mp4" %}',
+                '{% static "video/wednesday.mp4" %}',
+                '{% static "video/thursday.mp4" %}',
+                '{% static "video/friday.mp4" %}',
+                '{% static "video/saturday.mp4" %}'
+            ];
+
+            var audioSources = [
+                '{% static "audio/sunday.mp3" %}',
+                '{% static "audio/monday.mp3" %}',
+                '{% static "audio/tuesday.mp3" %}',
+                '{% static "audio/wednesday.mp3" %}',
+                '{% static "audio/thursday.mp3" %}',
+                '{% static "audio/friday.mp3" %}',
+                '{% static "audio/saturday.mp3" %}'
+            ];
+
+            document.getElementById('video-source').src = videoSources[day];
+            document.getElementById('audio-source').src = audioSources[day];
+
+            document.getElementById('background-video').load();
+            document.getElementById('background-audio').load();
+
+            // 仅在 home 页显示欢迎界面
+            {% if request.path == '/' %}
+            setTimeout(function () {
+                var welcomeOverlay = document.getElementById('welcome-overlay');
+                welcomeOverlay.classList.add('active');
+
+                setTimeout(function () {
+                    welcomeOverlay.classList.remove('active');
+                }, 2000);
+            }, 5000);
+            {% endif %}
+        };
+
+        function stopMedia() {
+            document.getElementById('background-video').pause();
+            document.getElementById('background-audio').pause();
+        }
+    </script>
+</body>
+</html>

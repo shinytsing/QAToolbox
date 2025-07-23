@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试工程师工具</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>我的测试工程师工具</h1>
+
+    <div class="button-container">
+
+        <button class="tool-button" onclick="showTool('aiTestCaseGenerator')">
+            生成AI测试用例
+            <span class="tooltip">输入你的产品需求，越详细越好</span>
+        </button>
+
+
+        <button class="tool-button" onclick="showTool('testTool')">
+            在线测试工具
+            <span class="tooltip">输入代码并运行测试</span>
+        </button>
+
+        <button class="tool-button" onclick="showTool('qualityCheck')">
+            代码质量检查
+            <span class="tooltip">检查代码质量并提供反馈</span>
+        </button>
+
+        <button class="tool-button" onclick="showTool('performanceSimulator')">
+            性能测试模拟器
+            <span class="tooltip">模拟性能测试结果</span>
+        </button>
+
+        <button class="tool-button" onclick="showTool('bugTracker')">
+            缺陷跟踪器
+            <span class="tooltip">提交和跟踪缺陷</span>
+        </button>
+
+        <button class="tool-button" onclick="showTool('automationExample')">
+            自动化测试示例
+            <span class="tooltip">执行自动化测试脚本</span>
+        </button>
+
+        <button class="tool-button" onclick="showTool('responsiveTester')">
+            页面响应测试工具
+            <span class="tooltip">测试不同设备的响应</span>
+        </button>
+
+        <button class="tool-button" onclick="showTool('testCaseHelper')">
+            用例编写助手
+            <span class="tooltip">生成标准化测试用例文档</span>
+        </button>
+
+        <button class="tool-button" onclick="showTool('ciCdInfo')">
+            CI/CD 信息展示
+            <span class="tooltip">展示构建和部署状态</span>
+        </button>
+
+        <button class="tool-button" onclick="showTool('visualization')">
+            可视化结果分析图表
+            <span class="tooltip">展示测试结果的可视化图表</span>
+        </button>
+
+        <button class="tool-button" onclick="showTool('testPlanGenerator')">
+            测试计划生成器
+            <span class="tooltip">生成测试计划文档</span>
+        </button>
+    </div>
+
+    <div id="toolArea" class="tool-area"></div>
+
+    <script>
+        function showTool(tool) {
+            const toolArea = document.getElementById('toolArea');
+            toolArea.innerHTML = ''; // 清空内容
+            let formHTML = '';
+
+            switch (tool) {
+                case 'aiTestCaseGenerator':
+                formHTML = `<h2>生成AI测试用例</h2>
+                            <textarea placeholder="输入产品需求，越详细越好..."></textarea>
+                            <button>生成测试用例</button>`;
+                break;
+
+                case 'testTool':
+                    formHTML = `<h2>在线测试工具</h2>
+                                <textarea placeholder="输入你的代码..."></textarea>
+                                <button>运行测试</button>`;
+                    break;
+
+                case 'qualityCheck':
+                    formHTML = `<h2>代码质量检查</h2>
+                                <textarea placeholder="输入你的代码..."></textarea>
+                                <button>检查质量</button>`;
+                    break;
+
+                case 'performanceSimulator':
+                    formHTML = `<h2>性能测试模拟器</h2>
+                                <input type="number" placeholder="请求数量">
+                                <input type="number" placeholder="延迟（毫秒）">
+                                <button>模拟测试</button>`;
+                    break;
+
+                case 'bugTracker':
+                    formHTML = `<h2>缺陷跟踪器</h2>
+                                <input type="text" placeholder="缺陷标题">
+                                <textarea placeholder="缺陷描述..."></textarea>
+                                <button>提交缺陷</button>`;
+                    break;
+
+                case 'automationExample':
+                    formHTML = `<h2>自动化测试示例</h2>
+                                <textarea placeholder="输入自动化测试脚本..."></textarea>
+                                <button>执行测试</button>`;
+                    break;
+
+                case 'responsiveTester':
+                    formHTML = `<h2>页面响应测试工具</h2>
+                                <input type="text" placeholder="输入用户代理字符串">
+                                <select>
+                                    <option value="mobile">手机</option>
+                                    <option value="tablet">平板</option>
+                                    <option value="desktop">桌面</option>
+                                </select>
+                                <button>测试响应</button>`;
+                    break;
+
+                case 'testCaseHelper':
+                    formHTML = `<h2>用例编写助手</h2>
+                                <input type="text" placeholder="用例名称">
+                                <textarea placeholder="测试步骤..."></textarea>
+                                <button>生成用例</button>`;
+                    break;
+
+                case 'ciCdInfo':
+                    formHTML = `<h2>CI/CD 信息展示</h2>
+                                <p>获取当前构建状态...</p>`;
+                    break;
+
+                case 'visualization':
+                    formHTML = `<h2>可视化结果分析图表</h2>
+                                <p>展示测试结果图表...</p>`;
+                    break;
+
+                case 'testPlanGenerator':
+                    formHTML = `<h2>测试计划生成器</h2>
+                                <input type="text" placeholder="项目名称">
+                                <textarea placeholder="测试目标..."></textarea>
+                                <button>生成测试计划</button>`;
+                    break;
+
+                default:
+                    formHTML = `<h2>选择一个工具</h2>`;
+            }
+            toolArea.innerHTML = formHTML;
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            text-align: center;
+        }
+        .button-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .tool-button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            margin: 10px;
+            cursor: pointer;
+            position: relative;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        .tool-button:hover {
+            background-color: #0056b3;
+        }
+        .tooltip {
+            visibility: hidden;
+            width: 200px;
+            background-color: black;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 0;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%; /* Position the tooltip above the button */
+            left: 50%;
+            margin-left: -100px; /* Center the tooltip */
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .tool-button:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+        .tool-area {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 10px;
+        }
+        input {
+            width: calc(100% - 22px);
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 10px;
+        }
+        select {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 10px;
+        }
+    </style>
+</body>
+</html>

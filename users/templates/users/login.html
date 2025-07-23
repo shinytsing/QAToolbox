@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-5">
+
+    <!-- 显示消息 -->
+    {% if messages %}
+        <div class="alert alert-warning mb-4">  <!-- 同样添加 mb-4 类 -->
+            <ul class="list-unstyled">
+                {% for message in messages %}
+                    <li>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    <form method="POST" class="form-group">
+        {% csrf_token %}
+            <!-- 检查重定向逻辑 -->
+        {% if request.GET.next %}
+            <div class="alert alert-info mb-4">  <!-- 添加 mb-4 类以增加底部外边距 -->
+                <strong>温馨提示:</strong> 请先登录～
+            </div>
+        {% endif %}
+
+        <div class="mb-3">
+            <label for="username" class="form-label">用户名:</label>
+            <input type="text" name="username" required class="form-control" id="username">
+        </div>
+
+        <div class="mb-3">
+            <label for="password" class="form-label">密码:</label>
+            <input type="password" name="password" required class="form-control" id="password">
+        </div>
+
+        <div class="mb-3">
+            <label for="captcha" class="form-label">验证码:</label>
+            <input type="text" name="captcha" required class="form-control" id="captcha" placeholder="请输入验证码，大小写区分">
+            <img src="{% url 'generate_captcha' %}" alt="点击刷新验证码" title="点击刷新" id="captcha-image" style="cursor: pointer;">
+        </div>
+
+        <div class="form-check text-center">
+            <input type="checkbox" name="remember_me" class="form-check-input" id="rememberMe">
+            <label class="form-check-label" for="rememberMe">记住我</label>
+        </div>
+
+        <div class="text-center mt-3">
+            <button type="submit" class="btn btn-primary">登录</button>
+        </div>
+    </form>
+
+    {% if form.errors %}
+        <div class="alert alert-danger mb-4">  <!-- 同样添加 mb-4 类 -->
+            <ul>
+                {% for field in form %}
+                    {% for error in field.errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                {% endfor %}
+                {% for error in form.non_field_errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+    document.getElementById('captcha-image').onclick = function() {
+        this.src = '{% url "generate_captcha" %}?t=' + Math.random(); // 添加随机数避免缓存
+    };
+</script>
+
+{% endblock %}

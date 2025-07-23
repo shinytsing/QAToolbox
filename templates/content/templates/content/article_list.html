@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}留言墙{% endblock %}
+
+{% block content %}
+<div class="container">
+
+<a href="{% url 'article_create' %}" class="btn btn-primary">新建留言</a>
+<div class="mt-3">
+    {% for article in articles %}
+        <div class="media my-3" style="border-bottom: 1px solid #ccc; padding-bottom: 10px;">
+            <div class="media-body">
+                <h5 class="mt-0 mb-1">
+                    <a href="{% url 'article_detail' article.pk %}">{{ article.title }}</a>
+                </h5>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<div class="pagination" style="margin-top: 20px;">
+    {% if articles.has_previous %}
+        <a href="?page=1">&laquo; 首页</a>
+        <a href="?page={{ articles.previous_page_number }}">上一页</a>
+    {% endif %}
+
+    <span>第 {{ articles.number }} 页，共 {{ articles.paginator.num_pages }} 页</span>
+
+    {% if articles.has_next %}
+        <a href="?page={{ articles.next_page_number }}">下一页</a>
+        <a href="?page={{ articles.paginator.num_pages }}">末页 &raquo;</a>
+    {% endif %}
+</div>
+</div>
+{% endblock %}
+
+
+

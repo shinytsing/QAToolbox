@@ -1,0 +1,15 @@
+{% extends 'base.html' %} <!-- 确保路径正确 -->
+
+{% load static %} <!-- 确保在文件的开始处加载静态文件库 -->
+
+{% if messages %}
+<ul class="messages">
+    {% for message in messages %}
+    <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+{% block content %}
+<!-- 空内容，覆盖父模板 -->
+{% endblock %}

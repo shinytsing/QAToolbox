@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}删除确认{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="text-center">确认删除文章</h1>
+    <p class="text-center">确定要删除 "{{ article.title }}" 吗？</p>
+
+    <form method="post" class="text-center">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">确认</button>
+        <a href="{% url 'article_list' %}" class="btn btn-secondary">取消</a>
+    </form>
+</div>
+{% endblock %}

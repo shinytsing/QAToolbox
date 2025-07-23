@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}{{ user.username }} 的用户资料{% endblock %}
+
+{% block content %}
+<div class="container vh-100 d-flex flex-column align-items-center justify-content-center text-center">
+    <h1>{{ user.username }} 的用户资料</h1>
+    <div class="profile-info border p-4 rounded" style="width: 300px;">
+        <p><strong>用户名:</strong> {{ user.username }}</p>
+        <p><strong>电子邮件:</strong> {{ user.email }}</p>
+        <p><strong>注册时间:</strong> {{ user.date_joined }}</p>
+    </div>
+    <a href="{% url 'profile_edit' %}" class="btn btn-primary mt-2">编辑资料</a>
+    <a href="{% url 'logout' %}" class="btn btn-danger mt-2">登出</a>
+</div>
+{% endblock %}

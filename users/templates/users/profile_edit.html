@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}编辑用户资料{% endblock %}
+
+{% block content %}
+<div class="container vh-100 d-flex flex-column align-items-center justify-content-center text-center">
+    <h1>编辑资料</h1>
+    <form method="POST" class="border p-4 rounded" style="width: 300px;">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="username">用户名:</label>
+            <input type="text" id="username" name="username" value="{{ user.username }}" required class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="email">电子邮件:</label>
+            <input type="email" id="email" name="email" value="{{ user.email }}" required class="form-control">
+        </div>
+        <button type="submit" class="btn btn-primary">保存更改</button>
+    </form>
+    <a href="{% url 'profile_view' %}" class="btn btn-secondary mt-3">返回资料</a>
+</div>
+{% endblock %}

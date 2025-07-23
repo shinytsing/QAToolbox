@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Case Generator</title>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <h1>AI Test Case Generator</h1>
+        <textarea id="requirement" placeholder="Enter product requirements..."></textarea>
+        <button onclick="generateCases()">Generate</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function generateCases() {
+            const requirement = document.getElementById('requirement').value;
+            axios.post('/tool/api/generate-testcases/', {
+                requirement: requirement
+            }, {
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                // 自动触发下载
+                window.location.href = response.data.download_url;
+            })
+            .catch(error => {
+                document.getElementById('result').innerText =
+                    `Error: ${error.response?.data?.error || error.message}`;
+            });
+        }
+
+        function getCookie(name) {
+            // Django CSRF token获取
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    </script>
+</body>
+</html>

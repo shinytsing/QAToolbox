@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}注册{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    <form method="POST" class="form-group">
+        {% csrf_token %}
+
+        <!-- 显示消息 -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-warning">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <label for="username">用户名:</label>
+        <input type="text" name="username" required class="form-control">
+        <br>
+
+        <label for="password">密码:</label>
+        <input type="password" name="password" required class="form-control">
+        <br>
+
+        <label for="password_confirm">确认密码:</label>
+        <input type="password" name="password_confirm" required class="form-control">
+        <br>
+
+        <div class="mb-3">
+            <label for="email" class="form-label">邮箱（可选）:</label>
+            <input type="email" name="email" class="form-control" id="email">
+        </div>
+
+        <div class="text-center"> <!-- 使按钮居中 -->
+            <button type="submit" class="btn btn-primary">注册</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

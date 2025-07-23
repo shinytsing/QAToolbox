@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}{{ article.title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>{{ article.title }}</h1>
+    <p>{{ article.content }}</p>
+    <p>作者: {{ article.author.username }}</p>
+    <p>发布时间: {{ article.created_at }}</p>
+
+    <a href="{% url 'article_list' %}" class="btn btn-secondary">返回文章列表</a>
+
+
+    <div>
+        {% for comment in article.comment_set.all %}
+            <div class="comment border p-3 rounded my-2">
+                <p class="comment-author font-weight-bold">{{ comment.user.username }}</p>
+                <p>{{ comment.content }}</p>
+                <p class="comment-date text-muted">{{ comment.created_at }}</p>
+
+                {% if request.user.is_authenticated and request.user == comment.user %}
+                    <div class="comment-actions">
+                        <a href="{% url 'article_edit' comment.id %}" class="btn btn-warning btn-sm">编辑</a>
+                        <form action="{% url 'article_edit' comment.id %}" method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger btn-sm">删除</button>
+                        </form>
+                    </div>
+                {% endif %}
+            </div>
+        {% empty %}
+            <p>还没有评论。</p>
+        {% endfor %}
+    </div>
+
+    <!-- 评论输入框放在底部 -->
+    <form action="{% url 'add_comment' article.id %}" method="post" class="border p-3 rounded my-3">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="comment">添加评论:</label>
+            <textarea id="comment" name="content" required class="form-control" rows="3"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">提交评论</button>
+    </form>
+</div>
+{% endblock %}
