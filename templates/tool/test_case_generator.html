@@ -10,81 +10,166 @@
         
         <div class="form-group mb-4">
             <textarea id="requirement" class="form-control bg-dark bg-opacity-50 text-white border-white" 
-                      placeholder="请输入产品需求（例如：用户登录功能，支持手机号/邮箱登录，包含验证码校验）"
-                      rows="6" style="resize: none;"></textarea>
+                      placeholder="请输入产品需求" rows="6" style="resize: none;"></textarea>
         </div>
-        
+
         <div class="form-group mb-4">
-            <textarea id="user_prompt" class="form-control bg-dark bg-opacity-50 text-white border-white" 
-                      placeholder="可选：输入自定义提示词（不填则使用默认模板）"
-                      rows="4" style="resize: none;"></textarea>
+            <textarea id="user_prompt" class="form-control bg-dark bg-opacity-50 text-white border-white"
+                      placeholder="可选：输入测试prompt" rows="4" style="resize: none;"></textarea>
         </div>
-        
+
         <button id="generateBtn" class="btn btn-primary btn-lg mb-3">
             <i class="fas fa-magic mr-2"></i>一键生成
         </button>
-
         <div id="result" class="mt-3 text-center"></div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_script %}
-<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<!-- 强制添加CSRF令牌元标签 -->
+<meta name="csrf-token" content="{{ csrf_token }}">
+
+<!-- 强制加载axios -->
+<script src="https://cdn.jsdelivr.net/npm/axios@1.6.8/dist/axios.min.js"></script>
+
+<!-- 强制加载Font Awesome（确保图标不影响执行） -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
 <script>
-    // 页面加载完成后绑定事件
-    document.addEventListener('DOMContentLoaded', function() {
+    // 最基础的初始化函数，确保在任何情况下都能执行
+    function initGenerator() {
+        console.log('初始化生成器...');
+
+        // 直接获取元素（不依赖DOMContentLoaded）
+        const generateBtn = document.getElementById('generateBtn');
+        const requirementEl = document.getElementById('requirement');
+        const userPromptEl = document.getElementById('user_prompt');
+        const resultDiv = document.getElementById('result');
+
+        // 检查元素是否存在
+        if (!generateBtn || !requirementEl || !resultDiv) {
+            console.error('关键元素缺失！');
+            alert('页面加载失败，请刷新重试');
+            return false;
+        }
+
+        // 检查axios是否加载
+        if (typeof axios === 'undefined') {
+            console.error('axios未加载！');
+            alert('网络资源加载失败，请刷新重试');
+            return false;
+        }
+
         let isRequesting = false;
 
-        // 获取按钮元素并绑定点击事件
-        document.getElementById('generateBtn').addEventListener('click', generateCases);
+        // 强制绑定点击事件，覆盖任何可能的冲突
+        generateBtn.onclick = null; // 清除可能的旧事件
+        generateBtn.addEventListener('click', function(e) {
+            e.stopPropagation(); // 阻止事件冒泡
+            e.preventDefault(); // 阻止默认行为
+            generateCases();
+        });
 
+        // 强制添加直接调用的全局函数，方便控制台调试
+        window.generateCases = generateCases;
+
+        console.log('初始化完成，按钮已绑定事件');
+        return true;
+
+        // 核心生成函数
         function generateCases() {
+            console.log('generateCases被调用');
+
             if (isRequesting) {
-                document.getElementById('result').innerText = "请求处理中，请稍后再试...";
+                showResult('请求处理中，请稍后...', 'info');
                 return;
             }
 
-            const requirement = document.getElementById('requirement').value;
-            const userPrompt = document.getElementById('user_prompt').value;
+            const requirement = requirementEl.value.trim();
+            const userPrompt = userPromptEl.value.trim();
 
-            if (!requirement.trim()) {
-                document.getElementById('result').innerText = "请输入产品需求内容";
+            if (!requirement) {
+                showResult('请输入产品需求内容', 'error');
+                requirementEl.classList.add('border-danger');
+                setTimeout(() => requirementEl.classList.remove('border-danger'), 1000);
                 return;
             }
 
-            const defaultPrompt = `作为资深测试工程师，请根据以下产品需求生成全面的测试用例：
-1. 涵盖功能测试、边界测试、异常测试场景
-2. 每个测试用例需包含：测试场景、前置条件、操作步骤、预期结果
-3. 按模块或功能点分类组织
-4. 需考虑用户可能的误操作和极端情况
-产品需求：${requirement}`;
+            // 构建请求参数
+            const defaultPrompt = `根据产品需求生成测试用例：${requirement}`;
+            const finalPrompt = userPrompt || defaultPrompt;
 
-            const finalPrompt = userPrompt.trim() ? userPrompt : defaultPrompt;
-
+            // 更新状态
             isRequesting = true;
-            document.getElementById('result').innerText = "正在生成测试用例...";
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<span class="spinner-border spinner-border-sm mr-2"></span>生成中...';
+            showResult('正在生成...', 'info');
 
-            axios.post('/tool/api/generate-testcases/', {
-                requirement: requirement,
-                prompt: finalPrompt
-            }, {
+            // 获取CSRF令牌（多种方式）
+            const csrfToken = getCookie('csrftoken') ||
+                             document.querySelector('meta[name="csrf-token"]')?.content;
+
+            if (!csrfToken) {
+                resetState();
+                showResult('安全验证失败，请刷新', 'error');
+                return;
+            }
+
+            // 准备请求
+            const apiUrl = '/tool/api/generate-testcases/';
+            console.log('发送请求到:', apiUrl);
+            console.log('请求数据:', { requirement, prompt: finalPrompt });
+
+            // 最基础的fetch请求（不依赖axios）
+            fetch(apiUrl, {
+                method: 'POST',
                 headers: {
-                    'X-CSRFToken': getCookie('csrftoken'),
-                    'Content-Type': 'application/json'
-                }
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    requirement: requirement,
+                    prompt: finalPrompt
+                }),
+                credentials: 'include' // 确保携带cookie
             })
             .then(response => {
-                document.getElementById('result').innerText = "生成成功，正在下载...";
-                window.location.href = response.data.download_url;
+                console.log('响应状态:', response.status);
+                if (!response.ok) throw new Error(`HTTP错误: ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                console.log('响应数据:', data);
+                if (data.download_url) {
+                    showResult('生成成功，即将下载...', 'success');
+                    setTimeout(() => window.location.href = data.download_url, 1000);
+                } else {
+                    showResult('生成成功', 'success');
+                }
             })
             .catch(error => {
-                document.getElementById('result').innerText =
-                    `错误: ${error.response?.data?.error || error.message}`;
+                console.error('请求失败:', error);
+                showResult(`生成失败: ${error.message}`, 'error');
             })
             .finally(() => {
-                isRequesting = false;
+                resetState();
             });
+        }
+
+        // 辅助函数
+        function showResult(text, type) {
+            resultDiv.textContent = text;
+            resultDiv.className = `mt-3 text-center ${
+                type === 'error' ? 'text-danger' :
+                type === 'success' ? 'text-success' : 'text-info'
+            }`;
+        }
+
+        function resetState() {
+            isRequesting = false;
+            generateBtn.disabled = false;
+            generateBtn.innerHTML = '<i class="fas fa-magic mr-2"></i>一键生成';
         }
 
         function getCookie(name) {
@@ -101,6 +186,28 @@
             }
             return cookieValue;
         }
-    });
+    }
+
+    // 多层次触发初始化，确保执行
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initGenerator);
+    } else {
+        initGenerator();
+    }
+
+    // 最后保险：延迟1秒再试一次
+    setTimeout(initGenerator, 1000);
 </script>
+
+<style>
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+        20%, 40%, 60%, 80% { transform: translateX(5px); }
+    }
+    .border-danger {
+        animation: shake 0.5s;
+        border-color: #dc3545 !important;
+    }
+</style>
 {% endblock %}

@@ -220,6 +220,13 @@
             margin-bottom: 8px;
             color: var(--text-color);
         }
+
+        /* 抖动动画 */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
     </style>
 </head>
 <body>
@@ -262,93 +269,42 @@
             </div>
         </div>
 
-        <button onclick="generateCases()" id="generateBtn">
+        <button id="generateBtn">
             <i class="fas fa-magic"></i> 生成测试用例
         </button>
         <div id="result"></div>
     </div>
 
     <script>
+        // 页面加载完成后初始化事件绑定
+        document.addEventListener('DOMContentLoaded', function() {
+            // 绑定生成按钮点击事件（关键修复）
+            const generateBtn = document.getElementById('generateBtn');
+            generateBtn.addEventListener('click', generateCases);
+            console.log('生成按钮事件已绑定，等待点击...');
+        });
+
         // 切换示例显示/隐藏
         function toggleExamples(id) {
             const examples = document.getElementById(id);
             examples.classList.toggle('active');
         }
 
-        function generateCases() {
-            const requirement = document.getElementById('requirement').value.trim();
-            const prompt = document.getElementById('prompt').value.trim();
-            const resultDiv = document.getElementById('result');
-            const generateBtn = document.getElementById('generateBtn');
-            const originalBtnText = generateBtn.innerHTML;
-
-            // 输入验证
-            if (!requirement) {
-                showMessage('请输入产品需求内容', 'error');
-                // 添加抖动动画提示
-                document.getElementById('requirement').style.animation = 'none';
-                setTimeout(() => {
-                    document.getElementById('requirement').style.animation = 'shake 0.5s';
-                }, 10);
-                return;
-            }
-
-            // 显示加载状态
-            showMessage('正在生成测试用例，请稍候...', 'loading');
-            generateBtn.disabled = true;
-            generateBtn.innerHTML = '<div class="spinner"></div> 生成中...';
-
-            axios.post('/tools/api/generate-testcases/', {  // 修正URL路径为/tools/
-                requirement: requirement,
-                prompt: prompt  // 允许空值，后端会处理默认提示词
-            }, {
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken'),
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => {
-                if (response.data.download_url) {
-                    showMessage('测试用例生成成功，即将开始下载...', 'success');
-                    // 延迟下载，让用户看到成功消息
-                    setTimeout(() => {
-                        window.location.href = response.data.download_url;
-                    }, 1000);
-                } else {
-                    showMessage('生成成功，但未找到下载链接', 'success');
-                }
-            })
-            .catch(error => {
-                let errorMsg;
-                if (error.response && error.response.data && error.response.data.error) {
-                    errorMsg = error.response.data.error;
-                    // 针对常见错误提供更友好的提示
-                    if (errorMsg.includes('requirement and prompt are required')) {
-                        errorMsg = '请填写产品需求内容';
-                    }
-                } else {
-                    errorMsg = '生成测试用例失败，请稍后重试';
-                }
-                showMessage(errorMsg, 'error');
-            })
-            .finally(() => {
-                generateBtn.disabled = false;
-                generateBtn.innerHTML = originalBtnText;
-            });
-        }
-
+        // 显示消息提示
         function showMessage(text, type) {
             const resultDiv = document.getElementById('result');
             resultDiv.textContent = text;
             resultDiv.className = type;
-
-            // 添加淡入效果
+            resultDiv.style.display = 'block';
             resultDiv.style.opacity = '0';
+
+            // 淡入动画
             setTimeout(() => {
                 resultDiv.style.opacity = '1';
             }, 10);
         }
 
+        // 获取Cookie（用于CSRF验证）
         function getCookie(name) {
             let cookieValue = null;
             if (document.cookie && document.cookie !== '') {
@@ -364,26 +320,96 @@
             return cookieValue;
         }
 
-        // 为文本框添加输入事件监听，清除错误消息
-        document.getElementById('requirement').addEventListener('input', () => {
-            const resultDiv = document.getElementById('result');
-            if (resultDiv.classList.contains('error')) {
-                resultDiv.textContent = '';
-                resultDiv.className = '';
-            }
-        });
+        // 生成测试用例的核心函数
+        function generateCases() {
+            console.log('开始执行生成测试用例函数');
 
-        // 添加抖动动画样式
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes shake {
-                0%, 100% { transform: translateX(0); }
-                10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-                20%, 40%, 60%, 80% { transform: translateX(5px); }
+            // 获取DOM元素
+            const requirement = document.getElementById('requirement').value.trim();
+            const prompt = document.getElementById('prompt').value.trim();
+            const resultDiv = document.getElementById('result');
+            const generateBtn = document.getElementById('generateBtn');
+            const originalBtnText = generateBtn.innerHTML;
+
+            // 输入验证
+            if (!requirement) {
+                showMessage('请输入产品需求内容', 'error');
+                // 抖动动画提示
+                const reqElement = document.getElementById('requirement');
+                reqElement.style.animation = 'none';
+                setTimeout(() => {
+                    reqElement.style.animation = 'shake 0.5s';
+                }, 10);
+                return;
             }
-        `;
-        document.head.appendChild(style);
+
+            // 显示加载状态
+            showMessage('正在生成测试用例，请稍候...', 'loading');
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<div class="spinner"></div> 生成中...';
+
+            // 获取CSRF Token（关键验证）
+            const csrfToken = getCookie('csrftoken');
+            if (!csrfToken) {
+                showMessage('无法获取验证信息，请刷新页面重试', 'error');
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = originalBtnText;
+                return;
+            }
+
+            // 发送请求（关键修复）
+            console.log('准备发送请求到 /tool/api/generate-testcases/');
+            axios.post('/tool/api/generate-testcases/', {
+                requirement: requirement,
+                prompt: prompt
+            }, {
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 60000  // 60秒超时设置，避免无限等待
+            })
+            .then(response => {
+                console.log('请求成功，响应数据:', response.data);
+                if (response.data.download_url) {
+                    showMessage('测试用例生成成功，即将开始下载...', 'success');
+                    // 延迟下载，让用户看到成功消息
+                    setTimeout(() => {
+                        window.location.href = response.data.download_url;
+                    }, 1000);
+                } else {
+                    showMessage('生成成功，但未找到下载链接', 'success');
+                }
+            })
+            .catch(error => {
+                console.error('请求失败:', error);
+                let errorMsg = '生成测试用例失败，请稍后重试';
+
+                // 详细错误信息处理
+                if (error.response) {
+                    // 服务器返回错误
+                    errorMsg = error.response.data.error ||
+                              `服务器错误 (状态码: ${error.response.status})`;
+                } else if (error.request) {
+                    // 无响应错误
+                    errorMsg = '未收到服务器响应，请检查网络连接';
+                } else {
+                    // 请求配置错误
+                    errorMsg = `请求错误: ${error.message}`;
+                }
+
+                showMessage(errorMsg, 'error');
+            })
+            .finally(() => {
+                // 恢复按钮状态
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = originalBtnText;
+            });
+        }
     </script>
+
+
+
 
 </body>
 </html>
