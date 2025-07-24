@@ -8,6 +8,7 @@
     <div id="app">
         <h1>AI Test Case Generator</h1>
         <textarea id="requirement" placeholder="Enter product requirements..."></textarea>
+        <textarea id="prompt" placeholder="Enter your custom prompt (use {requirement} as placeholder)"></textarea>
         <button onclick="generateCases()">Generate</button>
         <div id="result"></div>
     </div>
@@ -15,8 +16,10 @@
     <script>
         function generateCases() {
             const requirement = document.getElementById('requirement').value;
+            const prompt = document.getElementById('prompt').value;  // 获取用户提示词
             axios.post('/tool/api/generate-testcases/', {
-                requirement: requirement
+                requirement: requirement,
+                prompt: prompt  // 发送提示词到后端
             }, {
                 headers: {
                     'X-CSRFToken': getCookie('csrftoken'),
@@ -24,7 +27,6 @@
                 }
             })
             .then(response => {
-                // 自动触发下载
                 window.location.href = response.data.download_url;
             })
             .catch(error => {
@@ -34,7 +36,7 @@
         }
 
         function getCookie(name) {
-            // Django CSRF token获取
+            // 保持不变
             let cookieValue = null;
             if (document.cookie && document.cookie !== '') {
                 const cookies = document.cookie.split(';');
