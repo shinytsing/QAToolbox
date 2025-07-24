@@ -10,20 +10,32 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+import os
 from pathlib import Path
+import sys
+
+# 加载环境变量
+try:
+    from .env import DEEPSEEK_API_KEY, API_RATE_LIMIT
+except ImportError:
+    # 开发环境 fallback
+    DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
+    API_RATE_LIMIT = os.environ.get('API_RATE_LIMIT', '10/minute')
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent  # 项目根目录
 
+# 将apps目录添加到Python路径
+sys.path.append(str(BASE_DIR / 'apps'))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-1^6^nfbpnl$vpi=o05c8n+%7#b@ldjegoj6u0-3*!t3a3m#*54'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-1^6^nfbpnl$vpi=o05c8n+%7#b@ldjegoj6u0-3*!t3a3m#*54')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = ['shenyiqing.xin', '47.103.143.152', 'localhost', '127.0.0.1']
 
@@ -38,12 +50,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'captcha',
-    'django.contrib.sites',  # 需要开启此项才能使用 Django 自带的 CAPTCHA
+    'django.contrib.sites',  # 用于CAPTCHA
+    'rest_framework',  # DRF框架
+    # 自定义应用
     'users',
     'content',
-    'rest_framework',  # 如果使用DRF
     'tools',
-
 ]
 
 MIDDLEWARE = [
@@ -56,13 +68,12 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'config.urls'
+ROOT_URLCONF = 'apps.QAToolBox.urls'  # 修正为项目实际的URL配置路径
 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates']
-        ,
+        'DIRS': [BASE_DIR / 'templates'],  # 模板目录
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -75,7 +86,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'QAToolBox.wsgi.application'
+WSGI_APPLICATION = 'apps.QAToolBox.wsgi.application'
 
 
 # Database
@@ -111,9 +122,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'zh-hans'  # 中文
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Shanghai'  # 上海时区
 
 USE_I18N = True
 
@@ -122,18 +133,49 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
-# 静态文件的 URL
+
 STATIC_URL = '/static/'
 
-# 指定静态文件目录
+# 静态文件源目录（开发环境）
 STATICFILES_DIRS = [
-    BASE_DIR / "src/static",  # 确保路径正确
+    BASE_DIR / 'src/static',  # 与实际静态文件目录对应
 ]
+
+# 收集静态文件的目录（生产环境）
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# 媒体文件配置
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-LOGIN_URL = '/user/login/'  # 用户未登录时重定向到的登录URL
-LOGIN_REDIRECT_URL = '/'  # 登录后的重定向URL
+# 登录配置
+LOGIN_URL = '/users/login/'  # 登录URL路径
+LOGIN_REDIRECT_URL = '/'  # 登录后重定向URL
+LOGOUT_REDIRECT_URL = '/'  # 登出后重定向URL
+
+# DRF配置
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': API_RATE_LIMIT,
+        'user': API_RATE_LIMIT
+    }
+}
+
+# 第三方API配置
+DEEPSEEK_API_KEY = DEEPSEEK_API_KEY
+
+# 站点配置（用于captcha）
+SITE_ID = 1

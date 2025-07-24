@@ -1,10 +1,11 @@
+{% load static %}  <!-- 添加这行代码 -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>测试工程师工具</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">  <!-- 正确路径 -->
 </head>
 <body>
     <h1>我的测试工程师工具</h1>
@@ -80,7 +81,7 @@
                 case 'aiTestCaseGenerator':
                 formHTML = `<h2>生成AI测试用例</h2>
                             <textarea placeholder="输入产品需求，越详细越好..."></textarea>
-                            <button>生成测试用例</button>`;
+                            <button>AI生成测试用例</button>`;
                 break;
 
                 case 'testTool':

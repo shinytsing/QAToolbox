@@ -1,25 +1,134 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Test Case Generator</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Test Case Generator</title>
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f7fa;
+        }
+        #app {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        textarea {
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            resize: vertical;
+            font-family: inherit;
+            font-size: 14px;
+        }
+        #requirement {
+            min-height: 120px;
+        }
+        #prompt {
+            min-height: 80px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+        }
+        .error {
+            background-color: #fdecea;
+            color: #e74c3c;
+            display: block;
+        }
+        .success {
+            background-color: #eafaf1;
+            color: #27ae60;
+            display: block;
+        }
+        .loading {
+            background-color: #f1f9f7;
+            color: #2980b9;
+            display: block;
+        }
+        .hint {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin: -10px 0 15px 0;
+            font-style: italic;
+        }
+    </style>
 </head>
 <body>
     <div id="app">
         <h1>AI Test Case Generator</h1>
-        <textarea id="requirement" placeholder="Enter product requirements..."></textarea>
-        <textarea id="prompt" placeholder="Enter your custom prompt (use {requirement} as placeholder)"></textarea>
-        <button onclick="generateCases()">Generate</button>
+
+        <textarea
+            id="requirement"
+            placeholder="Enter product requirements in detail..."
+            required
+        ></textarea>
+
+        <textarea
+            id="prompt"
+            placeholder="Enter your custom prompt (use {requirement} as placeholder for requirements)..."
+        ></textarea>
+        <div class="hint">
+            提示：留空将使用默认提示词模板，例如"根据{requirement}生成详细测试用例，包含测试步骤和预期结果"
+        </div>
+
+        <button onclick="generateCases()" id="generateBtn">Generate Test Cases</button>
         <div id="result"></div>
     </div>
 
     <script>
         function generateCases() {
-            const requirement = document.getElementById('requirement').value;
-            const prompt = document.getElementById('prompt').value;  // 获取用户提示词
+            const requirement = document.getElementById('requirement').value.trim();
+            const prompt = document.getElementById('prompt').value.trim();
+            const resultDiv = document.getElementById('result');
+            const generateBtn = document.getElementById('generateBtn');
+
+            // 输入验证
+            if (!requirement) {
+                showMessage('请输入产品需求内容', 'error');
+                return;
+            }
+
+            // 显示加载状态
+            showMessage('正在生成测试用例，请稍候...', 'loading');
+            generateBtn.disabled = true;
+
             axios.post('/tool/api/generate-testcases/', {
                 requirement: requirement,
-                prompt: prompt  // 发送提示词到后端
+                prompt: prompt  // 允许空值，后端会处理默认提示词
             }, {
                 headers: {
                     'X-CSRFToken': getCookie('csrftoken'),
@@ -27,16 +136,33 @@
                 }
             })
             .then(response => {
-                window.location.href = response.data.download_url;
+                if (response.data.download_url) {
+                    showMessage('测试用例生成成功，即将开始下载...', 'success');
+                    // 延迟下载，让用户看到成功消息
+                    setTimeout(() => {
+                        window.location.href = response.data.download_url;
+                    }, 1000);
+                } else {
+                    showMessage('生成成功，但未找到下载链接', 'success');
+                }
             })
             .catch(error => {
-                document.getElementById('result').innerText =
-                    `Error: ${error.response?.data?.error || error.message}`;
+                const errorMsg = error.response?.data?.error ||
+                                '生成测试用例失败，请稍后重试';
+                showMessage(errorMsg, 'error');
+            })
+            .finally(() => {
+                generateBtn.disabled = false;
             });
         }
 
+        function showMessage(text, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = text;
+            resultDiv.className = type;
+        }
+
         function getCookie(name) {
-            // 保持不变
             let cookieValue = null;
             if (document.cookie && document.cookie !== '') {
                 const cookies = document.cookie.split(';');
@@ -50,6 +176,15 @@
             }
             return cookieValue;
         }
+
+        // 为文本框添加输入事件监听，清除错误消息
+        document.getElementById('requirement').addEventListener('input', () => {
+            const resultDiv = document.getElementById('result');
+            if (resultDiv.classList.contains('error')) {
+                resultDiv.textContent = '';
+                resultDiv.className = '';
+            }
+        });
     </script>
 </body>
 </html>

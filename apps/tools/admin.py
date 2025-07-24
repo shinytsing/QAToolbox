@@ -1,5 +1,5 @@
 # admin.py
-from tool.models import ToolUsageLog
+from apps.tools.models import ToolUsageLog
 
 
 # @admin.register(ToolUsageLog)
