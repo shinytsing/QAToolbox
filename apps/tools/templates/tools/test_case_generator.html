@@ -1,132 +1,304 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Test Case Generator</title>
+    <title>AI测试用例生成器</title>
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <!-- 引入Font Awesome图标库 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
+        :root {
+            --primary-color: #3498db;
+            --primary-dark: #2980b9;
+            --success-color: #27ae60;
+            --error-color: #e74c3c;
+            --loading-color: #2980b9;
+            --light-gray: #f5f7fa;
+            --medium-gray: #ddd;
+            --dark-gray: #7f8c8d;
+            --text-color: #2c3e50;
+            --shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #f5f7fa;
+            background-color: var(--light-gray);
+            color: var(--text-color);
+            line-height: 1.6;
         }
+
         #app {
             background: white;
             padding: 30px;
             border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow);
+            transition: transform 0.3s ease;
         }
+
+        #app:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        }
+
         h1 {
-            color: #2c3e50;
+            color: var(--text-color);
             text-align: center;
             margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--medium-gray);
         }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
         textarea {
             width: 100%;
             padding: 15px;
-            margin-bottom: 15px;
-            border: 1px solid #ddd;
+            margin-bottom: 5px;
+            border: 1px solid var(--medium-gray);
             border-radius: 6px;
             resize: vertical;
             font-family: inherit;
             font-size: 14px;
+            transition: border-color 0.3s, box-shadow 0.3s;
         }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+        }
+
         #requirement {
-            min-height: 120px;
+            min-height: 150px;
         }
+
         #prompt {
-            min-height: 80px;
+            min-height: 100px;
         }
+
         button {
-            background-color: #3498db;
+            background-color: var(--primary-color);
             color: white;
             border: none;
             padding: 12px 24px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 16px;
-            transition: background-color 0.3s;
+            font-weight: 600;
+            transition: background-color 0.3s, transform 0.2s;
             width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
+
         button:hover {
-            background-color: #2980b9;
+            background-color: var(--primary-dark);
+            transform: translateY(-1px);
         }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
         button:disabled {
-            background-color: #bdc3c7;
+            background-color: var(--medium-gray);
             cursor: not-allowed;
+            transform: none;
         }
+
         #result {
             margin-top: 20px;
             padding: 15px;
             border-radius: 6px;
             display: none;
+            transition: opacity 0.3s;
         }
+
         .error {
             background-color: #fdecea;
-            color: #e74c3c;
+            color: var(--error-color);
             display: block;
+            border-left: 4px solid var(--error-color);
         }
+
         .success {
             background-color: #eafaf1;
-            color: #27ae60;
+            color: var(--success-color);
             display: block;
+            border-left: 4px solid var(--success-color);
         }
+
         .loading {
             background-color: #f1f9f7;
-            color: #2980b9;
+            color: var(--loading-color);
             display: block;
+            border-left: 4px solid var(--loading-color);
         }
+
         .hint {
             font-size: 12px;
-            color: #7f8c8d;
-            margin: -10px 0 15px 0;
+            color: var(--dark-gray);
+            margin: -5px 0 15px 0;
             font-style: italic;
+            padding-left: 5px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .example-toggle {
+            color: var(--primary-color);
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 12px;
+            cursor: pointer;
+            text-decoration: underline;
+            margin-top: 5px;
+            width: auto;
+            display: inline;
+        }
+
+        .example-toggle:hover {
+            color: var(--primary-dark);
+            background: none;
+            transform: none;
+        }
+
+        .examples {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            font-size: 13px;
+            display: none;
+        }
+
+        .examples.active {
+            display: block;
+        }
+
+        .examples h4 {
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: var(--text-color);
+        }
+
+        .examples p {
+            margin-bottom: 8px;
+            color: var(--text-color);
         }
     </style>
 </head>
 <body>
     <div id="app">
-        <h1>AI Test Case Generator</h1>
+        <h1>AI测试用例生成器</h1>
 
-        <textarea
-            id="requirement"
-            placeholder="Enter product requirements in detail..."
-            required
-        ></textarea>
-
-        <textarea
-            id="prompt"
-            placeholder="Enter your custom prompt (use {requirement} as placeholder for requirements)..."
-        ></textarea>
-        <div class="hint">
-            提示：留空将使用默认提示词模板，例如"根据{requirement}生成详细测试用例，包含测试步骤和预期结果"
+        <div class="form-group">
+            <label for="requirement">产品需求 <span style="color: var(--error-color)">*</span></label>
+            <textarea
+                id="requirement"
+                placeholder="请详细描述产品需求，例如：用户登录功能，支持手机号和邮箱登录，包含记住密码选项..."
+                required
+            ></textarea>
+            <button class="example-toggle" onclick="toggleExamples('requirementExamples')">
+                查看示例
+            </button>
+            <div id="requirementExamples" class="examples">
+                <h4>需求示例：</h4>
+                <p>1. 用户注册功能：支持手机号注册，需输入验证码，密码长度至少8位，包含字母和数字</p>
+                <p>2. 购物车功能：可添加商品、修改数量、删除商品，支持勾选商品结算</p>
+            </div>
         </div>
 
-        <button onclick="generateCases()" id="generateBtn">Generate Test Cases</button>
+        <div class="form-group">
+            <label for="prompt">自定义提示词</label>
+            <textarea
+                id="prompt"
+                placeholder="请输入自定义提示词（使用{requirement}作为需求占位符），例如：根据{requirement}生成详细的测试用例，包含测试场景、测试步骤和预期结果..."
+            ></textarea>
+            <div class="hint">
+                提示：留空将使用默认提示词模板，生成包含多级结构的测试用例
+            </div>
+            <button class="example-toggle" onclick="toggleExamples('promptExamples')">
+                查看示例
+            </button>
+            <div id="promptExamples" class="examples">
+                <h4>提示词示例：</h4>
+                <p>1. 根据{requirement}生成全面的测试用例，包括功能测试、边界测试和异常测试，使用## 分类 ### 子项 - 用例的格式</p>
+                <p>2. 针对{requirement}设计用户场景测试用例，每个用例包含前置条件、测试步骤和预期结果</p>
+            </div>
+        </div>
+
+        <button onclick="generateCases()" id="generateBtn">
+            <i class="fas fa-magic"></i> 生成测试用例
+        </button>
         <div id="result"></div>
     </div>
 
     <script>
+        // 切换示例显示/隐藏
+        function toggleExamples(id) {
+            const examples = document.getElementById(id);
+            examples.classList.toggle('active');
+        }
+
         function generateCases() {
             const requirement = document.getElementById('requirement').value.trim();
             const prompt = document.getElementById('prompt').value.trim();
             const resultDiv = document.getElementById('result');
             const generateBtn = document.getElementById('generateBtn');
+            const originalBtnText = generateBtn.innerHTML;
 
             // 输入验证
             if (!requirement) {
                 showMessage('请输入产品需求内容', 'error');
+                // 添加抖动动画提示
+                document.getElementById('requirement').style.animation = 'none';
+                setTimeout(() => {
+                    document.getElementById('requirement').style.animation = 'shake 0.5s';
+                }, 10);
                 return;
             }
 
             // 显示加载状态
             showMessage('正在生成测试用例，请稍候...', 'loading');
             generateBtn.disabled = true;
+            generateBtn.innerHTML = '<div class="spinner"></div> 生成中...';
 
-            axios.post('/tool/api/generate-testcases/', {
+            axios.post('/tools/api/generate-testcases/', {  // 修正URL路径为/tools/
                 requirement: requirement,
                 prompt: prompt  // 允许空值，后端会处理默认提示词
             }, {
@@ -147,12 +319,21 @@
                 }
             })
             .catch(error => {
-                const errorMsg = error.response?.data?.error ||
-                                '生成测试用例失败，请稍后重试';
+                let errorMsg;
+                if (error.response && error.response.data && error.response.data.error) {
+                    errorMsg = error.response.data.error;
+                    // 针对常见错误提供更友好的提示
+                    if (errorMsg.includes('requirement and prompt are required')) {
+                        errorMsg = '请填写产品需求内容';
+                    }
+                } else {
+                    errorMsg = '生成测试用例失败，请稍后重试';
+                }
                 showMessage(errorMsg, 'error');
             })
             .finally(() => {
                 generateBtn.disabled = false;
+                generateBtn.innerHTML = originalBtnText;
             });
         }
 
@@ -160,6 +341,12 @@
             const resultDiv = document.getElementById('result');
             resultDiv.textContent = text;
             resultDiv.className = type;
+
+            // 添加淡入效果
+            resultDiv.style.opacity = '0';
+            setTimeout(() => {
+                resultDiv.style.opacity = '1';
+            }, 10);
         }
 
         function getCookie(name) {
@@ -185,6 +372,17 @@
                 resultDiv.className = '';
             }
         });
+
+        // 添加抖动动画样式
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes shake {
+                0%, 100% { transform: translateX(0); }
+                10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+                20%, 40%, 60%, 80% { transform: translateX(5px); }
+            }
+        `;
+        document.head.appendChild(style);
     </script>
 </body>
 </html>

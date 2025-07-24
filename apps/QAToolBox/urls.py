@@ -19,19 +19,22 @@ from django.contrib import admin
 from django.urls import include, path
 from apps.QAToolBox.views import home_view, tool_view
 from django.http import HttpResponse
-
-
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
-    path('',home_view, name='home'),
+    path('', home_view, name='home'),
     path('admin/', admin.site.urls),
-    path('tools/', tool_view, name='tools'),  # 允许访问 /tools.html
-
-    path('users/', include('apps.users.urls')),  # 确保这里包含了 QAToolBox 的 URL
-    path('content/', include('apps.content.urls')),  # 假设你的内容管理路由是这样设置的
-    path('about/', lambda request: HttpResponse('关于页面'), name='about'),  # 临时占位符
-    path('contact/', lambda request: HttpResponse('联系页面'), name='contact'),  # 临时占位符
+    # 工具主页面路由
+    path('tools/', tool_view, name='tools'),
+    # 工具子路由（包含测试用例生成器等）
+    path('tools/', include('apps.tools.urls')),
+    path('users/', include('apps.users.urls')),
+    path('content/', include('apps.content.urls')),
+    path('about/', lambda request: HttpResponse('关于页面'), name='about'),
+    path('contact/', lambda request: HttpResponse('联系页面'), name='contact'),
 ]
 
-
-
+# 开发环境下提供媒体文件访问
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

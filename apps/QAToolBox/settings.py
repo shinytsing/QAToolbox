@@ -13,14 +13,18 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 import os
 from pathlib import Path
 import sys
+import os
+from pathlib import Path
 
-# 加载环境变量
-try:
-    from .env import DEEPSEEK_API_KEY, API_RATE_LIMIT
-except ImportError:
-    # 开发环境 fallback
-    DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
-    API_RATE_LIMIT = os.environ.get('API_RATE_LIMIT', '10/minute')
+from apps.tools.utils import API_RATE_LIMIT
+
+# 加载 .env.py 文件
+env_path = Path(__file__).resolve().parent.parent.parent / '.env.py'
+if env_path.exists():
+    with open(env_path, 'r') as f:
+        # 执行 .env.py 文件中的赋值语句
+        exec(f.read())
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent  # 项目根目录
@@ -175,7 +179,7 @@ REST_FRAMEWORK = {
 }
 
 # 第三方API配置
-DEEPSEEK_API_KEY = DEEPSEEK_API_KEY
+DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
 
 # 站点配置（用于captcha）
 SITE_ID = 1

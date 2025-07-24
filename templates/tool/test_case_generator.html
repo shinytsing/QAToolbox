@@ -15,8 +15,9 @@
     <script>
         function generateCases() {
             const requirement = document.getElementById('requirement').value;
-            axios.post('/tool/api/generate-testcases/', {
-                requirement: requirement
+            axios.post('/tools/api/generate-testcases/', {
+                requirement: requirement,
+                prompt: "你的提示词模板"  // 补充之前遗漏的 prompt 参数
             }, {
                 headers: {
                     'X-CSRFToken': getCookie('csrftoken'),
