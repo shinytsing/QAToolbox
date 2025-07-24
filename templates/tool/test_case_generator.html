@@ -37,6 +37,25 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
 <script>
+    // 专业的默认测试用例生成提示词
+    const DEFAULT_PROFESSIONAL_PROMPT = `作为一名资深测试工程师，请根据以下产品需求生成全面、系统的测试用例。要求包含：
+1. 功能测试：验证所有功能点是否按需求实现
+2. 边界测试：检验输入输出的边界条件
+3. 异常测试：验证系统对错误输入和异常场景的处理
+4. 兼容性测试：考虑不同环境下的表现（如适用）
+5. 易用性测试：评估用户操作流程的合理性
+
+请按照以下格式组织测试用例：
+- 测试模块：[模块名称]
+  - 测试用例ID：[唯一标识]
+  - 测试目标：[明确测试目的]
+  - 前置条件：[执行测试的前提条件]
+  - 测试步骤：[详细操作步骤]
+  - 预期结果：[明确的预期输出]
+  - 优先级：[高/中/低]
+
+产品需求：{requirement}`;
+
     // 最基础的初始化函数，确保在任何情况下都能执行
     function initGenerator() {
         console.log('初始化生成器...');
@@ -96,9 +115,8 @@
                 return;
             }
 
-            // 构建请求参数
-            const defaultPrompt = `根据产品需求生成测试用例：${requirement}`;
-            const finalPrompt = userPrompt || defaultPrompt;
+            // 构建请求参数 - 使用专业默认提示词
+            const finalPrompt = userPrompt || DEFAULT_PROFESSIONAL_PROMPT.replace('{requirement}', requirement);
 
             // 更新状态
             isRequesting = true;
@@ -117,7 +135,7 @@
             }
 
             // 准备请求
-            const apiUrl = '/tool/api/generate-testcases/';
+            const apiUrl = '/tools/api/generate-testcases/';
             console.log('发送请求到:', apiUrl);
             console.log('请求数据:', { requirement, prompt: finalPrompt });
 
