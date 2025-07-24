@@ -6,9 +6,9 @@
 </head>
 <body>
     <div id="app">
-        <h1>AI Test Case Generator</h1>
+        <h1>AI生成测试用例</h1>
         <textarea id="requirement" placeholder="Enter product requirements..."></textarea>
-        <button onclick="generateCases()">Generate</button>
+        <button onclick="generateCases()">一键生成</button>
         <div id="result"></div>
     </div>
 
@@ -17,7 +17,7 @@
             const requirement = document.getElementById('requirement').value;
             axios.post('/tools/api/generate-testcases/', {
                 requirement: requirement,
-                prompt: "你的提示词模板"  // 补充之前遗漏的 prompt 参数
+                prompt: "你是一个经验丰富的测试工程师，你需要为产品开发测试用例。"  // 补充之前遗漏的 prompt 参数
             }, {
                 headers: {
                     'X-CSRFToken': getCookie('csrftoken'),
@@ -50,5 +50,68 @@
             return cookieValue;
         }
     </script>
+
+
+<script>
+    let isRequesting = false; // 添加请求状态锁
+
+    function generateCases() {
+        // 检查是否正在请求中，若正在请求则直接返回
+        if (isRequesting) {
+            document.getElementById('result').innerText = "请求处理中，请稍后再试...";
+            return;
+        }
+
+        const requirement = document.getElementById('requirement').value;
+        const userPrompt = document.getElementById('user_prompt').value; // 假设添加了提示词输入框
+
+        if (!requirement || !userPrompt) {
+            document.getElementById('result').innerText = "需求和提示词不能为空";
+            return;
+        }
+
+        // 锁定请求状态
+        isRequesting = true;
+        document.getElementById('result').innerText = "正在生成测试用例...";
+
+        axios.post('/tool/api/generate-testcases/', {
+            requirement: requirement,
+            prompt: userPrompt
+        }, {
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            // 自动触发下载
+            window.location.href = response.data.download_url;
+            document.getElementById('result').innerText = "生成成功，正在下载...";
+        })
+        .catch(error => {
+            document.getElementById('result').innerText =
+                `错误: ${error.response?.data?.error || error.message}`;
+        })
+        .finally(() => {
+            // 无论成功失败，都解锁请求状态
+            isRequesting = false;
+        });
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
 </body>
 </html>

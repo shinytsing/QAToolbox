@@ -17,13 +17,13 @@ import os
 from pathlib import Path
 
 from apps.tools.utils import API_RATE_LIMIT
+# 在文件最顶部添加
+import os
+from dotenv import load_dotenv
 
-# 加载 .env.py 文件
-env_path = Path(__file__).resolve().parent.parent.parent / '.env.py'
-if env_path.exists():
-    with open(env_path, 'r') as f:
-        # 执行 .env.py 文件中的赋值语句
-        exec(f.read())
+# 加载.env文件
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env.py'))
+
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.

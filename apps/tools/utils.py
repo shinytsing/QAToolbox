@@ -1,43 +1,59 @@
 import os
 import requests
-from django.conf import settings
+from ratelimit import limits, sleep_and_retry
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from ratelimit import limits, sleep_and_retry
+# 替换为 django-ratelimit 的装饰器
+from django_ratelimit.decorators import ratelimit  # 新增导入
 
-import json
-import xmind
-# 从环境变量获取API密钥和速率限制
+# 从环境变量获取配置
 DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
 API_RATE_LIMIT = os.getenv('API_RATE_LIMIT', '10/minute')
-RATE_LIMIT_CALLS, RATE_LIMIT_PERIOD = API_RATE_LIMIT.split('/')
-RATE_LIMIT_PERIOD = {'minute': 60, 'hour': 3600}[RATE_LIMIT_PERIOD]
+
+# 解析速率限制配置
+try:
+    RATE_LIMIT_CALLS, RATE_LIMIT_PERIOD = API_RATE_LIMIT.split('/')
+    RATE_LIMIT_PERIOD = {'minute': 60, 'hour': 3600}[RATE_LIMIT_PERIOD.lower()]
+except (ValueError, KeyError):
+    RATE_LIMIT_CALLS = 10
+    RATE_LIMIT_PERIOD = 60
 
 
 class DeepSeekClient:
     API_BASE_URL = "https://api.deepseek.com/v1/chat/completions"
+    TIMEOUT = 60  # 超时时间（秒）
 
     def __init__(self):
         self.api_key = DEEPSEEK_API_KEY
         if not self.api_key:
-            raise ValueError("DEEPSEEK_API_KEY is not set in environment variables")
+            raise ValueError("DEEPSEEK_API_KEY 未在环境变量中设置，请检查 .env.py 文件")
 
+    @sleep_and_retry
+    @limits(calls=int(RATE_LIMIT_CALLS), period=int(RATE_LIMIT_PERIOD))
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((requests.exceptions.Timeout, requests.exceptions.ConnectionError))
+    )
+    def generate_test_cases(self, requirement: str, user_prompt: str) -> str:
+        if not requirement or not user_prompt:
+            raise ValueError("需求内容和提示词模板不能为空")
 
-    def generate_test_cases(self, requirement, user_prompt):
-        """
-        调用DeepSeek API生成测试用例
-        :param requirement: 产品需求
-        :param user_prompt: 用户自定义的提示词模板
-        :return: 生成的测试用例结构
-        """
-        # 构建完整提示词
-        full_prompt = user_prompt.format(requirement=requirement)
+        # 构建完整提示词（要求输出Markdown格式，方便解析为XMind结构）
+        full_prompt = user_prompt.format(
+            requirement=requirement,
+            format="请使用Markdown格式输出：# 场景名称 作为一级标题，- 测试用例 作为列表项"
+        )
 
         payload = {
             "model": "deepseek-chat",
             "messages": [
-                {"role": "system", "content": "你是一位专业的测试工程师，擅长生成全面的测试用例"},
+                {"role": "system", "content": "你是专业测试工程师，生成测试用例时需包含场景和具体用例，用Markdown格式输出"},
                 {"role": "user", "content": full_prompt}
             ],
             "temperature": 0.7,
-            "max_tokens": 2048
+            "max_tokens": 2048,
+            "stream": False
         }
 
         headers = {
@@ -50,44 +66,22 @@ class DeepSeekClient:
                 self.API_BASE_URL,
                 json=payload,
                 headers=headers,
-                timeout=30
+                timeout=self.TIMEOUT
             )
             response.raise_for_status()
             result = response.json()
             return result['choices'][0]['message']['content']
         except requests.exceptions.RequestException as e:
-            raise Exception(f"API request failed: {str(e)}")
+            error_detail = f"状态码: {response.status_code}" if 'response' in locals() else "无状态码"
+            raise Exception(f"API请求失败: {str(e)} ({error_detail})")
 
 
 
-# 可以在utils.py中补充XMind生成工具类
-class XMindWriter:
-    def create_from_structure(self, data):
-        """从结构化数据创建XMind内容"""
-        self.workbook = xmind.loads()  # 假设使用xmind库
-        self.sheet = self.workbook.getPrimarySheet()
-        self.sheet.setTitle(data["title"])
 
-        root_topic = self.sheet.getRootTopic()
 
-        for section, content in data["structure"].items():
-            section_topic = root_topic.addSubTopic()
-            section_topic.setTitle(section)
-
-            for item in content:
-                if isinstance(item, dict):
-                    # 处理二级标题
-                    sub_topic = section_topic.addSubTopic()
-                    sub_topic.setTitle(item["name"])
-                    # 添加用例
-                    for case in item["items"]:
-                        case_topic = sub_topic.addSubTopic()
-                        case_topic.setTitle(case)
-                else:
-                    # 处理一级用例
-                    case_topic = section_topic.addSubTopic()
-                    case_topic.setTitle(item)
-
-    def save(self, file_path):
-        """保存到文件"""
-        xmind.save(self.workbook, file_path)
+# 新增：针对视图的用户级限频装饰器（1分钟最多3次请求）
+def user_ratelimit(view_func):
+    @ratelimit(key='user', rate='3/m', method='POST', block=True)
+    def wrapper(request, *args, **kwargs):
+        return view_func(request, *args, **kwargs)
+    return wrapper
