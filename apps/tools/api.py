@@ -2,7 +2,8 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from .models import ToolUsageLog  # 正确的模型导入路径Z
+from .models import ToolUsageLog
+from .serializers import ToolUsageLogSerializer
 from .utils import DeepSeekClient
 import tempfile
 import os
@@ -22,30 +23,48 @@ logger = logging.getLogger(__name__)
 class GenerateTestCasesAPI(APIView):
     permission_classes = [IsAuthenticated]
 
-    # 优化优化提示词模板，明确输出格式要求
-    DEFAULT_PROMPT = """作为为资深测试工程师，请根据以下产品需求生成全面的测试用例，严格严格格遵循格式要求：
-1. 层级结构：
-   - # 一级模块（如：用户管理）
-   - ## 二级功能（如：登录功能）
-   - ### 三级子功能（如：密码登录）
+    # 保留详细字段同时维持指定格式
+    DEFAULT_PROMPT = """根据以下产品需求生成全球化APP测试用例集，需遵循指定格式:
+{requirement}
 
-2. 测试用例格式（每个用例必须以####开头）：
-   #### 测试ID: [模块缩写]_XXX（如：USR_LOGIN_001）
-   - 测试场景: [清晰描述测试场景]
-   - 前置条件:
-     1. [条件1]
-     2. [条件2]
-   - 测试步骤:
-     1. [步骤1]
-     2. [步骤2]
-   - 预期结果:
-     1. [结果1]
-     2. [结果2]
-   - 重要程度: [高/中/低]
+## 输出格式要求
+1. 测试用例以标题为分割，格式为：**测试ID 测试标题**
+2. 每个测试用例包含以下字段，使用层级列表：
+   - 场景：描述测试场景
+   - 前置条件：执行前的系统状态
+   - 前置条件不满足时的预期结果：前置条件不满足时的系统表现
+   - 测试目的：验证的功能点或场景
+   - 测试环境：设备/系统/网络环境
+   - 测试数据：含正常值/边界值/异常值
+   - 测试步骤：编号列出，每个步骤后紧跟其预期结果
+     1. 步骤内容
+        预期结果：具体结果描述1
+        预期结果：具体结果描述2
+     2. 步骤内容
+        预期结果：具体结果描述1
+   - 重要程度：高/中/低
+   - 测试类型：标记所属类型(可多选)
 
-3. 必须包含的测试类型：功能测试、边界测试、异常测试
+3. 按功能模块组织，使用## 标记模块
 
-产品需求：{requirement}"""
+## 示例格式
+## 红包功能模块
+**TC-020 多语言红包测试**
+    - 场景：非中文环境下使用红包
+    - 前置条件：设置微信为英文
+    - 前置条件不满足时的预期结果：系统提示需要切换到英文环境
+    - 测试目的：验证多语言环境下红包功能的正确性
+    - 测试环境：iOS 16.0，网络环境良好
+    - 测试数据：20元红包，英文系统语言
+    - 测试步骤：
+        1. 发送红包
+            预期结果：1. 所有文本正确翻译
+            预期结果：2. 功能正常
+        2. 查看界面文本
+            预期结果：1. 所有文本正确翻译
+            预期结果：2. 功能正常
+    - 重要程度：低
+    - 测试类型：国际化测试,功能测试"""
 
     def post(self, request):
         try:
@@ -66,7 +85,6 @@ class GenerateTestCasesAPI(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # 处理文件名
             truncated_req = requirement[:20].strip() if requirement else "default"
             invalid_chars = r'[\\/*?:"<>| ]'
             cleaned_req = re.sub(invalid_chars, '_', truncated_req)
@@ -75,30 +93,14 @@ class GenerateTestCasesAPI(APIView):
 
             final_prompt = user_prompt if user_prompt else self.DEFAULT_PROMPT.format(requirement=requirement)
 
-            # 调用DeepSeek API生成测试用例
             try:
                 deepseek = DeepSeekClient()
-                # 增加格式约束参数
-                raw_response = deepseek.generate_test_cases(
-                    requirement,
-                    final_prompt
-                    # 移除format_check参数，与utils.py保持兼容
-                )
-
-                # 终端打印完整响应
-                print("\n" + "=" * 80)
-                print("DeepSeek API完整返回内容:")
-                print("-" * 80)
-                print(raw_response)
-                print("-" * 80 + "\n")
+                raw_response = deepseek.generate_test_cases(requirement, final_prompt)
+                logger.info("DeepSeek API返回原始数据:")
+                logger.info(raw_response)
 
                 if not raw_response:
                     raise ValueError("未从API获取到有效响应")
-
-                # 验证API返回格式
-                if not self._validate_response_format(raw_response):
-                    raise ValueError("API返回内容不符合格式要求，请重试")
-
             except Exception as e:
                 logger.error(f"DeepSeek API调用失败: {str(e)}", exc_info=True)
                 return Response(
@@ -106,28 +108,28 @@ class GenerateTestCasesAPI(APIView):
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
 
-            # 解析API响应（增强版解析器）
+            # 解析测试用例，同时保留原始响应
             test_cases = self._parse_test_cases(raw_response)
+            # 确保原始响应被保存
+            test_cases['raw_response'] = raw_response
 
-            # 确保输出目录存在
             output_dir = os.path.join(settings.MEDIA_ROOT, 'tool_outputs')
             os.makedirs(output_dir, exist_ok=True)
 
-            # 创建FreeMind格式文件
             with tempfile.NamedTemporaryFile(suffix='.mm', delete=False, mode='w', encoding='utf-8') as tmp:
                 mindmap_xml = self._generate_freemind(test_cases)
                 tmp.write(mindmap_xml)
                 tmp.flush()
 
-                # 保存到模型
                 log = ToolUsageLog.objects.create(
                     user=request.user,
                     tool_type='TEST_CASE',
                     input_data=json.dumps({
                         'requirement': requirement,
-                        'prompt': final_prompt,
-                        'generation_time': (datetime.now() - start_time).total_seconds()
-                    })
+                        'prompt': final_prompt
+                    }),
+                    # 存储原始响应到数据库
+                    raw_response=raw_response
                 )
 
                 with open(tmp.name, 'rb') as f:
@@ -135,334 +137,394 @@ class GenerateTestCasesAPI(APIView):
 
                 os.unlink(tmp.name)
 
-            # 验证文件是否成功保存
             saved_file_path = os.path.join(output_dir, outfile_name)
-            file_status = "存在" if os.path.exists(saved_file_path) else "不存在"
-            logger.info(
-                f"用户 {request.user.username} 测试用例生成成功，"
-                f"耗时: {(datetime.now() - start_time).total_seconds():.2f}秒，"
-                f"文件: {saved_file_path} ({file_status})"
-            )
+            if os.path.exists(saved_file_path):
+                logger.info(f"用户 {request.user.username} 测试用例生成成功，文件: {saved_file_path}")
+            else:
+                logger.warning(f"用户 {request.user.username} 测试用例生成成功，但文件未找到: {saved_file_path}")
 
-            # 构建更详细的响应数据
-            response_data = {
-                'status': 'success',
-                'message': '测试用例生成成功',
-                'download_url': f'/tools/download/{outfile_name}',  # 修正URL路径，与urls.py保持一致
+            return Response({
+                'download_url': f'/tools/download/{outfile_name}',
                 'log_id': log.id,
-                'metadata': {
-                    'generation_time': f"{(datetime.now() - start_time).total_seconds():.2f}秒",
-                    'case_count': self._count_test_cases(test_cases),
-                    'module_count': len(test_cases.get('levels', []))
-                },
-                'raw_response': raw_response,
+                'raw_response': raw_response,  # 返回原始响应
                 'structured_test_cases': test_cases
-            }
-
-            return Response(response_data, status=status.HTTP_200_OK)
+            })
 
         except Exception as e:
-            # 处理start_time可能未定义的情况
-            duration = (datetime.now() - start_time).total_seconds() if 'start_time' in locals() else 0
             logger.error(
                 f"用户 {request.user.username} 测试用例生成失败，"
-                f"耗时: {duration:.2f}秒，"
+                f"耗时: {(datetime.now() - start_time).total_seconds()}秒，"
                 f"错误: {str(e)}",
                 exc_info=True
             )
 
             return Response(
-                {
-                    'status': 'error',
-                    'error': f'服务器处理失败: {str(e)}',
-                    'details': str(e) if settings.DEBUG else None
-                },
+                {'error': f'服务器处理失败: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-    def _validate_response_format(self, raw_response):
-        """验证API返回内容是否符合格式要求"""
-        # 检查是否包含至少一个测试用例
-        if '#### 测试ID:' not in raw_response:
-            logger.warning("API返回缺少测试用例标记")
-            return False
-
-        # 检查是否包含层级结构
-        if '#' not in raw_response:
-            logger.warning("API返回缺少层级结构")
-            return False
-
-        # 检查测试用例是否包含必要字段
-        case_sections = re.split(r'#### 测试ID:', raw_response)[1:]
-        for section in case_sections:
-            if '测试场景:' not in section or '测试步骤:' not in section or '预期结果:' not in section:
-                logger.warning(f"测试用例缺少必要字段: {section[:100]}...")
-                return False
-
-        return True
-
-    def _count_test_cases(self, test_cases):
-        """统计测试用例总数"""
-        count = 0
-        for level1 in test_cases.get('levels', []):
-            for level2 in level1.get('level2', []):
-                for level3 in level2.get('level3', []):
-                    count += len(level3.get('cases', []))
-        return count
-
-    def _clean_text(self, text):
-        """清除特殊字符但保留必要格式"""
-        # 清除Markdown粗体标记(**)
-        cleaned = re.sub(r'\*\*', '', text)
-        # 清除多余空格
-        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-        return cleaned
-
     def _parse_test_cases(self, raw_response):
-        """增强版解析器，提高格式兼容性"""
-        parsed_data = {
-            "title": "测试用例集",
-            "levels": []  # 存储一级模块
+        """增强解析逻辑，优先确保保留所有原始内容"""
+        print("DeepSeek返回的原始测试用例:")
+        print(raw_response)
+
+        # 首先保存完整的原始响应
+        structured_data = {
+            "title": "AI生成测试用例",
+            "original_content": raw_response,  # 保存完整原始内容
+            "modules": {},  # 按模块组织
+            "unparsed_sections": []  # 存储无法解析的完整段落
         }
 
-        # 按行分割内容
-        lines = [line.rstrip('\n') for line in raw_response.splitlines()]
-        current_level1 = None  # 一级模块（# 开头）
-        current_level2 = None  # 二级功能（## 开头）
-        current_level3 = None  # 三级子功能（### 开头）
-        current_case = None  # 当前测试用例
-        current_field = None  # 当前字段（测试场景、前置条件等）
+        # 按段落分割内容，而不是按行，减少内容碎片化
+        paragraphs = re.split(r'\n\s*\n', raw_response.strip())
+        current_module = None
+        current_case = None
 
-        # 支持的字段列表
-        supported_fields = ['测试场景', '前置条件', '测试步骤', '预期结果', '重要程度']
-
-        for line in lines:
-            stripped_line = line.strip()
-            if not stripped_line:
+        # 先尝试整体解析
+        for para in paragraphs:
+            if not para.strip():
                 continue
 
-            # 1. 识别一级模块（# 开头）
-            if line.startswith('# ') and not line.startswith('##'):
-                # 重置所有下级结构
-                current_level1 = {
-                    "title": self._clean_text(line[2:].strip()),
-                    "level2": []
-                }
-                parsed_data["levels"].append(current_level1)
-                current_level2 = None
-                current_level3 = None
-                current_case = None
-                continue
+            # 处理模块 (## 标题)
+            if para.strip().startswith('## '):
+                # 保存上一个用例
+                if current_case and current_module:
+                    structured_data["modules"][current_module]["cases"].append(current_case)
 
-            # 2. 识别二级功能（## 开头）
-            if line.startswith('## ') and not line.startswith('###') and current_level1:
-                current_level2 = {
-                    "title": self._clean_text(line[3:].strip()),
-                    "level3": []
-                }
-                current_level1["level2"].append(current_level2)
-                current_level3 = None
-                current_case = None
-                continue
-
-            # 3. 识别三级子功能（### 开头）
-            if line.startswith('### ') and current_level2:
-                current_level3 = {
-                    "title": self._clean_text(line[4:].strip()),
+                module_name = para.strip()[3:].strip()
+                current_module = module_name
+                structured_data["modules"][module_name] = {
+                    "name": module_name,
+                    "original_content": para,  # 保存模块原始内容
                     "cases": []
                 }
-                current_level2["level3"].append(current_level3)
                 current_case = None
                 continue
 
-            # 4. 识别测试用例（#### 开头）
-            if (line.startswith('####') or '测试ID:' in line) and current_level3:
-                # 保存上一个测试用例
+            # 处理测试用例标题 (**开头)
+            if para.strip().startswith('**') and para.strip().endswith('**') and current_module:
+                # 保存上一个用例
                 if current_case:
-                    current_level3["cases"].append(current_case)
+                    structured_data["modules"][current_module]["cases"].append(current_case)
 
-                # 初始化新测试用例
-                current_case = {
-                    "test_id": "",
-                    "测试场景": "",
-                    "前置条件": [],
-                    "测试步骤": [],
-                    "预期结果": [],
-                    "重要程度": ""
-                }
+                # 提取测试ID和标题
+                case_header = para.strip()[2:-2].strip()
+                test_id = ""
+                test_title = case_header
 
-                # 提取测试ID（增强版匹配）
-                case_title = self._clean_text(line.strip())
-                id_match = re.search(r'测试ID\s*[:：]\s*([A-Za-z0-9_]+)', case_title)
+                id_match = re.match(r'^([A-Z0-9-]+)\s+(.*)$', case_header)
                 if id_match:
-                    current_case["test_id"] = id_match.group(1)
-                else:
-                    # 尝试从标题中提取ID（如WXHB_001）
-                    id_candidate = re.search(r'[A-Z]+_\d+', case_title)
-                    if id_candidate:
-                        current_case["test_id"] = id_candidate.group()
-                    else:
-                        # 自动生成ID
-                        case_count = len(current_level3["cases"]) + 1
-                        module_abbr = current_level3["title"][:3].upper()
-                        current_case["test_id"] = f"{module_abbr}_{case_count:03d}"
+                    test_id = id_match.group(1)
+                    test_title = id_match.group(2)
+
+                # 初始化新测试用例，包含所有必要字段和原始内容
+                current_case = {
+                    "测试ID": test_id,
+                    "测试标题": test_title,
+                    "original_content": para,  # 保存用例原始内容
+                    "测试场景": "",
+                    "前置条件": "",
+                    "前置条件不满足时的预期结果": "",
+                    "测试目的": "",
+                    "测试环境": "",
+                    "测试数据": "",
+                    "测试步骤": [],  # 包含预期结果的字典列表
+                    "重要程度": "",
+                    "测试类型": [],
+                    "unparsed_lines": []  # 存储用例中无法解析的行
+                }
                 continue
 
-            # 5. 处理测试用例字段
+            # 处理用例内容
             if current_case:
-                # 识别字段标题（测试场景、前置条件等）
-                field_match = None
-                for field in supported_fields:
-                    pattern = re.compile(rf'^{field}\s*[:：]\s*(.*)$')
-                    match = pattern.match(stripped_line)
-                    if match:
-                        field_match = (field, match.group(1))
-                        break
+                # 按行解析段落内的内容
+                self._parse_case_paragraph(para, current_case)
+                continue
 
-                if field_match:
-                    current_field, field_content = field_match
-                    cleaned_content = self._clean_text(field_content)
+            # 无法关联到任何模块或用例的内容
+            structured_data["unparsed_sections"].append(para)
 
-                    # 处理有初始内容的字段
-                    if cleaned_content:
-                        if current_field in ['前置条件', '测试步骤', '预期结果']:
-                            current_case[current_field].append(cleaned_content)
-                        else:
-                            current_case[current_field] = cleaned_content
-                    continue
+        # 添加最后一个用例
+        if current_case and current_module:
+            structured_data["modules"][current_module]["cases"].append(current_case)
 
-                # 处理列表项（支持数字+点号或-开头）
-                list_item_match = re.match(r'^(\d+\.|\-)\s*(.*)$', stripped_line)
-                if list_item_match and current_field in ['前置条件', '测试步骤', '预期结果']:
-                    item_content = self._clean_text(list_item_match.group(2))
-                    current_case[current_field].append(item_content)
-                    continue
-
-                # 处理字段的延续内容
-                if current_field and stripped_line:
-                    cleaned_line = self._clean_text(stripped_line)
-                    if current_field in ['前置条件', '测试步骤', '预期结果']:
-                        # 如果最后一个元素存在，尝试合并
-                        if current_case[current_field]:
-                            current_case[current_field][-1] += " " + cleaned_line
-                        else:
-                            current_case[current_field].append(cleaned_line)
-                    else:
-                        current_case[current_field] += " " + cleaned_line
-
-        # 添加最后一个测试用例
-        if current_case and current_level3 and current_case not in current_level3["cases"]:
-            current_level3["cases"].append(current_case)
-
-        # 处理没有解析到任何内容的情况
-        if not parsed_data["levels"]:
-            parsed_data["levels"].append({
-                "title": "默认模块",
-                "level2": [{
-                    "title": "默认功能",
-                    "level3": [{
-                        "title": "默认子功能",
-                        "cases": [{
-                            "test_id": "DEFAULT_001",
-                            "测试场景": "未解析到有效测试用例",
-                            "前置条件": ["系统正常运行"],
-                            "测试步骤": ["检查API返回格式是否正确"],
-                            "预期结果": ["返回符合要求的测试用例格式"],
-                            "重要程度": "中"
-                        }]
-                    }]
+        # 处理没有解析到任何模块的情况
+        if not structured_data["modules"]:
+            structured_data["modules"]["默认模块"] = {
+                "name": "默认模块",
+                "original_content": raw_response,
+                "cases": [{
+                    "测试ID": "DEFAULT-001",
+                    "测试标题": "默认测试用例",
+                    "original_content": raw_response,
+                    "测试场景": "未解析到结构化测试用例",
+                    "前置条件": "",
+                    "前置条件不满足时的预期结果": "",
+                    "测试目的": "",
+                    "测试环境": "",
+                    "测试数据": "",
+                    "测试步骤": [],
+                    "重要程度": "中",
+                    "测试类型": ["功能测试"],
+                    "unparsed_lines": raw_response.split('\n')  # 保存原始内容
                 }]
-            })
+            }
 
-        return parsed_data
+        # 打印结构化后的测试用例
+        print("\n结构化后的测试用例:")
+        import pprint
+        pprint.pprint(structured_data)
+
+        return structured_data
+
+    def _parse_case_paragraph(self, paragraph, current_case):
+        """解析用例段落中的内容，尽可能结构化同时保留无法解析的部分"""
+        current_field = None
+        current_step = None
+        line_buffer = []
+
+        for line in paragraph.split('\n'):
+            stripped_line = line.strip()
+            indent_level = len(line) - len(line.lstrip())
+
+            if not stripped_line:
+                if line_buffer:
+                    self._process_line_buffer(line_buffer, current_case, current_field, current_step)
+                    line_buffer = []
+                continue
+
+            # 尝试匹配已知字段
+            field_match = re.match(
+                r'^-?\s*(场景|前置条件|前置条件不满足时的预期结果|测试目的|测试环境|测试数据|重要程度|测试类型)\s*[:：]\s*(.*)$',
+                stripped_line)
+
+            if field_match:
+                if line_buffer:
+                    self._process_line_buffer(line_buffer, current_case, current_field, current_step)
+                    line_buffer = []
+
+                current_field = field_match.group(1)
+                field_value = field_match.group(2).strip()
+
+                # 字段映射
+                field_mapping = {
+                    "场景": "测试场景",
+                    "前置条件": "前置条件",
+                    "前置条件不满足时的预期结果": "前置条件不满足时的预期结果",
+                    "测试目的": "测试目的",
+                    "测试环境": "测试环境",
+                    "测试数据": "测试数据",
+                    "重要程度": "重要程度",
+                    "测试类型": "测试类型"
+                }
+
+                internal_field = field_mapping.get(current_field)
+                if internal_field:
+                    if internal_field == "测试类型":
+                        current_case[internal_field] = [t.strip() for t in re.split(r'[,，]', field_value) if t.strip()]
+                    else:
+                        current_case[internal_field] = field_value
+
+                current_step = None  # 重置步骤跟踪
+                continue
+
+            # 处理测试步骤 (数字. 开头)
+            step_match = re.match(r'^(\d+)\.\s+(.*)$', stripped_line)
+            if step_match and indent_level > 4:
+                if line_buffer:
+                    self._process_line_buffer(line_buffer, current_case, current_field, current_step)
+                    line_buffer = []
+
+                step_content = step_match.group(2).strip()
+                current_step = {
+                    "步骤": step_content,
+                    "预期结果": [],
+                    "unparsed_lines": []  # 步骤中无法解析的内容
+                }
+                current_case["测试步骤"].append(current_step)
+                current_field = "测试步骤"
+                continue
+
+            # 处理预期结果 (预期结果: 开头)
+            expected_match = re.match(r'^预期结果[:：]\s*(.*)$', stripped_line)
+            if expected_match and current_step and current_field == "测试步骤":
+                expected_result = expected_match.group(1).strip()
+                current_step["预期结果"].append(expected_result)
+                continue
+
+            # 无法立即解析的内容加入缓冲
+            line_buffer.append(line)
+
+        # 处理剩余的缓冲内容
+        if line_buffer:
+            self._process_line_buffer(line_buffer, current_case, current_field, current_step)
+
+    def _process_line_buffer(self, buffer, current_case, current_field, current_step):
+        """处理缓冲的行内容，尽可能归类或保存为额外内容"""
+        if not current_case:
+            return
+
+        # 将缓冲内容合并为文本
+        buffer_text = '\n'.join([line.strip() for line in buffer if line.strip()])
+
+        if not buffer_text:
+            return
+
+        # 尝试将内容归类到当前字段
+        if current_field and current_field != "测试步骤":
+            # 追加到当前字段
+            current_case_field = {
+                "场景": "测试场景",
+                "前置条件": "前置条件",
+                "前置条件不满足时的预期结果": "前置条件不满足时的预期结果",
+                "测试目的": "测试目的",
+                "测试环境": "测试环境",
+                "测试数据": "测试数据",
+                "重要程度": "重要程度",
+                "测试类型": "测试类型"
+            }.get(current_field)
+
+            if current_case_field:
+                if current_case_field == "测试类型":
+                    types = [t.strip() for t in re.split(r'[,，]', buffer_text) if t.strip()]
+                    current_case[current_case_field].extend(types)
+                else:
+                    current_case[current_case_field] += "\n" + buffer_text
+                return
+
+        # 如果是测试步骤中的内容
+        if current_field == "测试步骤" and current_step:
+            # 检查是否是预期结果
+            if buffer_text.startswith("预期结果"):
+                expected_match = re.match(r'^预期结果[:：]\s*(.*)$', buffer_text)
+                if expected_match:
+                    current_step["预期结果"].append(expected_match.group(1).strip())
+                    return
+                else:
+                    current_step["unparsed_lines"].append(buffer_text)
+                    return
+            # 否则作为步骤补充内容
+            current_step["步骤"] += "\n" + buffer_text
+            return
+
+        # 无法归类的内容保存到用例的未解析行中
+        current_case["unparsed_lines"].append(buffer_text)
 
     def _generate_freemind(self, test_cases):
-        """生成与测试用例层级匹配的FreeMind XML"""
+        """生成FreeMind XML，包含所有字段和原始内容"""
         ET.register_namespace('', 'http://freemind.sourceforge.net/wiki/index.php/XML')
 
         map_root = ET.Element("map")
         map_root.set("version", "1.0.1")
 
-        # 根节点
         root_topic = ET.SubElement(map_root, "node")
         root_topic.set("TEXT", test_cases["title"])
         root_topic.set("STYLE", "bubble")
         root_topic.set("COLOR", "#000000")
 
-        # 一级模块（# 标题）
-        for level1 in test_cases["levels"]:
-            level1_node = ET.SubElement(root_topic, "node")
-            level1_node.set("TEXT", level1["title"])
-            level1_node.set("COLOR", "#FF5733")  # 一级节点颜色
-            level1_node.set("STYLE", "fork")
+        # 添加完整原始响应节点
+        raw_node = ET.SubElement(root_topic, "node")
+        raw_node.set("TEXT", "完整原始响应")
+        raw_node.set("COLOR", "#808080")
+        # 按段落展示原始响应
+        for para in re.split(r'\n\s*\n', test_cases["original_content"].strip()):
+            if para.strip():
+                para_node = ET.SubElement(raw_node, "node")
+                para_node.set("TEXT", para.strip()[:150] + ("..." if len(para) > 150 else ""))
 
-            # 二级功能（## 标题）
-            for level2 in level1["level2"]:
-                level2_node = ET.SubElement(level1_node, "node")
-                level2_node.set("TEXT", level2["title"])
-                level2_node.set("COLOR", "#33FF57")  # 二级节点颜色
-                level2_node.set("STYLE", "fork")
+        # 添加未解析段落节点（如果有）
+        if test_cases["unparsed_sections"]:
+            unparsed_node = ET.SubElement(root_topic, "node")
+            unparsed_node.set("TEXT", "未解析段落")
+            unparsed_node.set("COLOR", "#FF0000")
+            for section in test_cases["unparsed_sections"]:
+                section_node = ET.SubElement(unparsed_node, "node")
+                section_node.set("TEXT", section.strip()[:100] + ("..." if len(section) > 100 else ""))
 
-                # 三级子功能（### 标题）
-                for level3 in level2["level3"]:
-                    level3_node = ET.SubElement(level2_node, "node")
-                    level3_node.set("TEXT", level3["title"])
-                    level3_node.set("COLOR", "#3357FF")  # 三级节点颜色
-                    level3_node.set("STYLE", "fork")
+        for module_name, module_data in test_cases["modules"].items():
+            module_node = ET.SubElement(root_topic, "node")
+            module_node.set("TEXT", module_name)
+            module_node.set("COLOR", "#FF7F50")
+            module_node.set("STYLE", "fork")
 
-                    # 测试用例
-                    for case in level3["cases"]:
-                        case_node = ET.SubElement(level3_node, "node")
-                        case_title = f"{case['test_id']}" if case['test_id'] else "未命名用例"
-                        case_node.set("TEXT", case_title)
-                        case_node.set("COLOR", "#FF33F5")  # 用例节点颜色
-                        case_node.set("STYLE", "bullet")
+            # 添加模块原始内容
+            module_raw_node = ET.SubElement(module_node, "node")
+            module_raw_node.set("TEXT", "模块原始内容")
+            module_raw_node.set("COLOR", "#808080")
+            module_raw_node.set("TEXT", module_data["original_content"].strip()[:100] + (
+                "..." if len(module_data["original_content"]) > 100 else ""))
 
-                        # 测试场景
-                        if case["测试场景"]:
-                            scene_node = ET.SubElement(case_node, "node")
-                            scene_node.set("TEXT", f"测试场景: {case['测试场景']}")  # 修正属性名小写
-                            scene_node.set("COLOR", "#696969")
+            for case in module_data["cases"]:
+                self._add_case_to_node(module_node, case)
 
-                        # 前置条件
-                        if case["前置条件"]:
-                            precondition_node = ET.SubElement(case_node, "node")
-                            precondition_node.set("TEXT", "前置条件")
-                            precondition_node.set("COLOR", "#696969")
-
-                            for idx, item in enumerate(case["前置条件"], 1):
-                                item_node = ET.SubElement(precondition_node, "node")
-                                item_node.set("TEXT", f"{idx}. {item}")
-
-                        # 测试步骤
-                        if case["测试步骤"]:
-                            steps_node = ET.SubElement(case_node, "node")
-                            steps_node.set("TEXT", "测试步骤")
-                            steps_node.set("COLOR", "#696969")
-
-                            for idx, item in enumerate(case["测试步骤"], 1):
-                                item_node = ET.SubElement(steps_node, "node")
-                                item_node.set("TEXT", f"{idx}. {item}")
-
-                        # 预期结果
-                        if case["预期结果"]:
-                            expected_node = ET.SubElement(case_node, "node")
-                            expected_node.set("TEXT", "预期结果")
-                            expected_node.set("COLOR", "#696969")
-
-                            for idx, item in enumerate(case["预期结果"], 1):
-                                item_node = ET.SubElement(expected_node, "node")
-                                item_node.set("TEXT", f"{idx}. {item}")
-
-                        # 重要程度
-                        if case["重要程度"]:
-                            importance_node = ET.SubElement(case_node, "node")
-                            importance_node.set("TEXT", f"重要程度: {case['重要程度']}")
-                            # 根据重要程度设置不同颜色
-                            color_map = {"高": "#FF0000", "中": "#FFA500", "低": "#008000"}
-                            importance_node.set("COLOR", color_map.get(case["重要程度"], "#696969"))
-
-        # 格式化XML
         rough_string = ET.tostring(map_root, 'utf-8')
         reparsed = minidom.parseString(rough_string)
         return '\n'.join([line for line in reparsed.toprettyxml(indent="  ").split('\n') if line.strip()])
+
+    def _add_case_to_node(self, parent_node, case):
+        """将测试用例添加到节点，包含所有字段和原始内容"""
+        case_node = ET.SubElement(parent_node, "node")
+        case_title = f"{case['测试ID']}: {case['测试标题']}" if case['测试ID'] else case['测试标题']
+        case_node.set("TEXT", case_title)
+        case_node.set("COLOR", "#4682B4")
+        case_node.set("STYLE", "bullet")
+
+        # 添加用例原始内容
+        case_raw_node = ET.SubElement(case_node, "node")
+        case_raw_node.set("TEXT", "用例原始内容")
+        case_raw_node.set("COLOR", "#808080")
+        case_raw_node.set("TEXT", case["original_content"].strip()[:100] + (
+            "..." if len(case["original_content"]) > 100 else ""))
+
+        # 添加所有字段
+        fields = [
+            ("测试场景", case["测试场景"]),
+            ("前置条件", case["前置条件"]),
+            ("前置条件不满足时的预期结果", case["前置条件不满足时的预期结果"]),
+            ("测试目的", case["测试目的"]),
+            ("测试环境", case["测试环境"]),
+            ("测试数据", case["测试数据"]),
+            ("重要程度", case["重要程度"]),
+            ("测试类型", ", ".join(case["测试类型"]))
+        ]
+
+        for field_name, field_value in fields:
+            if field_value:
+                field_node = ET.SubElement(case_node, "node")
+                field_node.set("TEXT", f"{field_name}: {field_value}")
+                field_node.set("COLOR", "#696969")
+
+        # 添加测试步骤及对应的预期结果
+        if case["测试步骤"]:
+            steps_node = ET.SubElement(case_node, "node")
+            steps_node.set("TEXT", "测试步骤与预期结果")
+            steps_node.set("COLOR", "#8B4513")
+
+            for step in case["测试步骤"]:
+                step_node = ET.SubElement(steps_node, "node")
+                step_node.set("TEXT", f"步骤: {step['步骤']}")
+                step_node.set("COLOR", "#8B4513")
+
+                for i, expected in enumerate(step["预期结果"], 1):
+                    expected_node = ET.SubElement(step_node, "node")
+                    expected_node.set("TEXT", f"预期结果 {i}: {expected}")
+                    expected_node.set("COLOR", "#228B22")
+
+                # 步骤中的未解析内容
+                if step["unparsed_lines"]:
+                    step_unparsed = ET.SubElement(step_node, "node")
+                    step_unparsed.set("TEXT", "步骤未解析内容")
+                    step_unparsed.set("COLOR", "#FFA500")
+                    for line in step["unparsed_lines"]:
+                        line_node = ET.SubElement(step_unparsed, "node")
+                        line_node.set("TEXT", line[:100])
+
+        # 添加用例级别的未解析内容
+        if case["unparsed_lines"]:
+            extra_node = ET.SubElement(case_node, "node")
+            extra_node.set("TEXT", "用例未解析内容")
+            extra_node.set("COLOR", "#FFA500")
+            for content in case["unparsed_lines"]:
+                content_node = ET.SubElement(extra_node, "node")
+                content_node.set("TEXT", content[:100])

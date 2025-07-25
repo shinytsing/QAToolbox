@@ -291,6 +291,19 @@
             color: white;
         }
 
+        /* 测试用例展示区域样式 */
+        .test-case-display {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.9rem;
+            border: 1px solid #eee;
+        }
+
         /* 抖动动画 */
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
@@ -328,6 +341,33 @@
             display: flex;
             gap: 15px;
             margin-top: 30px;
+        }
+
+        .copy-btn {
+            margin-left: 10px;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+        }
+
+        /* 下载状态样式 */
+        .download-status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .download-success {
+            background-color: #eafaf1;
+            color: var(--success-color);
+        }
+
+        .download-pending {
+            background-color: #f1f9f7;
+            color: var(--loading-color);
         }
 
         @media (max-width: 768px) {
@@ -418,7 +458,7 @@
 
     <script>
         // 默认提示词 - 完整有效且结构化
-        let DEFAULT_PROMPT = `根据以下产品需求生成全球化APP全面可执行的测试用例集，需同时覆盖APP特性、国际化场景、埋点验证、AB实验及版本测试:
+       let DEFAULT_PROMPT = `根据以下产品需求生成全球化APP全面可执行的测试用例集，需同时覆盖APP特性、国际化场景、埋点验证、AB实验及版本测试:
 {requirement}
 
 ## 结构要求
@@ -611,6 +651,20 @@
             resultDiv.classList.add('show');
         }
 
+        // 复制文本到剪贴板
+        function copyToClipboard(text, btn) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> 已复制';
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                }, 2000);
+            }).catch(err => {
+                console.error('复制失败:', err);
+                alert('复制失败，请手动复制');
+            });
+        }
+
         // 获取Cookie（用于CSRF验证）
         function getCookie(name) {
             let cookieValue = null;
@@ -656,7 +710,7 @@
             generateBtn.disabled = true;
             generateBtn.innerHTML = '<div class="spinner"></div> 生成中...';
 
-            // 获取CSRF Token（关键验证）
+            // 获取CSRF Token
             const csrfToken = getCookie('csrftoken');
             if (!csrfToken) {
                 showMessage('无法获取验证信息，请刷新页面重试', 'error');
@@ -665,7 +719,7 @@
                 return;
             }
 
-            // 发送请求
+            // 发送请求 - 关键修改：使用blob响应类型处理文件流
             console.log('准备发送请求到 /tools/api/generate-testcases/');
             axios.post('/tools/api/generate-testcases/', {
                 requirement: requirement,
@@ -675,59 +729,111 @@
                     'X-CSRFToken': csrfToken,
                     'Content-Type': 'application/json'
                 },
-                timeout: 6000000 // 60秒超时
+                timeout: 600000, // 10分钟超时
+                responseType: 'blob' // 关键修改：指定响应类型为blob
             })
             .then(response => {
-                console.log('请求成功，响应数据:', response.data);
+                console.log('请求成功，开始处理响应');
                 const resultDiv = document.getElementById('result');
                 resultDiv.innerHTML = ''; // 清空旧内容
 
-                // 处理响应
-                if (response.data.error) {
-                    showMessage(response.data.error, 'error');
-                } else {
-                    // 构建下载链接
-                    const downloadLinks = document.createElement('div');
-                    downloadLinks.className = 'download-links';
-
-                    // 添加.mm文件下载
-                    if (response.data.download_mm_url) {
-                        const mmLink = document.createElement('a');
-                        mmLink.href = response.data.download_mm_url;
-                        mmLink.innerHTML = '<i class="fas fa-download"></i> 下载测试用例（FreeMind格式）';
-                        mmLink.target = '_blank';
-                        downloadLinks.appendChild(mmLink);
-                    }
-
-                    // 添加.png预览图
-                    if (response.data.preview_png_url) {
-                        const pngLink = document.createElement('a');
-                        pngLink.href = response.data.preview_png_url;
-                        pngLink.innerHTML = '<i class="fas fa-image"></i> 预览测试用例（图片）';
-                        pngLink.target = '_blank';
-                        downloadLinks.appendChild(pngLink);
-                    }
-
-                    // 显示结果
-                    resultDiv.appendChild(downloadLinks);
-                    showMessage('测试用例生成成功！', 'success');
+                // 从响应头获取文件名
+                const contentDisposition = response.headers['content-disposition'];
+                let filename = 'test_cases.mm';
+                if (contentDisposition && contentDisposition.includes('filename=')) {
+                    // 提取并解码文件名
+                    filename = decodeURIComponent(
+                        contentDisposition.split('filename=')[1].replace(/"/g, '')
+                    );
                 }
+
+                // 创建下载状态提示
+                const downloadStatus = document.createElement('div');
+                downloadStatus.className = 'download-status download-pending';
+                downloadStatus.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> 正在准备下载文件...';
+                resultDiv.appendChild(downloadStatus);
+
+                // 创建测试用例展示区域（同时显示内容）
+                const caseDisplay = document.createElement('div');
+                caseDisplay.className = 'test-case-display';
+                resultDiv.appendChild(caseDisplay);
+
+                // 添加复制按钮
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'btn btn-outline-primary btn-sm copy-btn';
+                copyBtn.innerHTML = '<i class="fas fa-copy"></i> 复制用例';
+                resultDiv.appendChild(copyBtn);
+
+                // 处理二进制文件流并自动下载
+                const blob = new Blob([response.data], { type: 'application/octet-stream' });
+                const url = window.URL.createObjectURL(blob);
+
+                // 创建隐藏的a标签并触发点击
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+
+                // 同时读取文本内容用于显示
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        // 尝试将内容作为文本显示
+                        caseDisplay.textContent = e.target.result;
+                        copyBtn.onclick = () => copyToClipboard(e.target.result, copyBtn);
+                    } catch (err) {
+                        console.error('无法解析文件内容:', err);
+                        caseDisplay.textContent = '无法显示文件内容，已自动下载文件';
+                    }
+                };
+                reader.readAsText(blob);
+
+                // 触发下载
+                setTimeout(() => {
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url); // 释放URL对象
+
+                    // 更新下载状态为成功
+                    downloadStatus.className = 'download-status download-success';
+                    downloadStatus.innerHTML = `<i class="fas fa-check"></i> 文件已自动下载: ${filename}`;
+
+                    // 显示成功消息
+                    showMessage('测试用例生成成功并已自动下载！', 'success');
+                }, 500);
+
             })
             .catch(error => {
                 console.error('请求失败:', error);
                 let errorMsg = '生成测试用例失败，请稍后重试';
 
-                // 详细错误信息处理
+                // 处理不同类型的错误
                 if (error.response) {
-                    errorMsg = error.response.data.error ||
-                              `服务器错误 (状态码: ${error.response.status})`;
+                    // 尝试解析错误响应（如果是JSON格式）
+                    if (error.response.data instanceof Blob) {
+                        // 转换blob为文本
+                        const reader = new FileReader();
+                        reader.onload = function() {
+                            try {
+                                const errorData = JSON.parse(reader.result);
+                                showMessage(errorData.error || '服务器返回错误', 'error');
+                            } catch (e) {
+                                showMessage(`服务器错误 (状态码: ${error.response.status})`, 'error');
+                            }
+                        };
+                        reader.readAsText(error.response.data);
+                    } else {
+                        errorMsg = error.response.data.error ||
+                                  `服务器错误 (状态码: ${error.response.status})`;
+                        showMessage(errorMsg, 'error');
+                    }
                 } else if (error.request) {
                     errorMsg = '未收到服务器响应，请检查网络连接';
+                    showMessage(errorMsg, 'error');
                 } else {
                     errorMsg = `请求错误: ${error.message}`;
+                    showMessage(errorMsg, 'error');
                 }
-
-                showMessage(errorMsg, 'error');
             })
             .finally(() => {
                 // 恢复按钮状态

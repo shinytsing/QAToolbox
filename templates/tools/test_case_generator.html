@@ -291,6 +291,19 @@
             color: white;
         }
 
+        /* 测试用例展示区域样式 */
+        .test-case-display {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.9rem;
+            border: 1px solid #eee;
+        }
+
         /* 抖动动画 */
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
@@ -328,6 +341,12 @@
             display: flex;
             gap: 15px;
             margin-top: 30px;
+        }
+
+        .copy-btn {
+            margin-left: 10px;
+            padding: 6px 12px;
+            font-size: 0.85rem;
         }
 
         @media (max-width: 768px) {
@@ -418,7 +437,7 @@
 
     <script>
         // 默认提示词 - 完整有效且结构化
-        let DEFAULT_PROMPT = `根据以下产品需求生成全球化APP全面可执行的测试用例集，需同时覆盖APP特性、国际化场景、埋点验证、AB实验及版本测试:
+       let DEFAULT_PROMPT = `根据以下产品需求生成全球化APP全面可执行的测试用例集，需同时覆盖APP特性、国际化场景、埋点验证、AB实验及版本测试:
 {requirement}
 
 ## 结构要求
@@ -611,6 +630,20 @@
             resultDiv.classList.add('show');
         }
 
+        // 复制文本到剪贴板
+        function copyToClipboard(text, btn) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> 已复制';
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                }, 2000);
+            }).catch(err => {
+                console.error('复制失败:', err);
+                alert('复制失败，请手动复制');
+            });
+        }
+
         // 获取Cookie（用于CSRF验证）
         function getCookie(name) {
             let cookieValue = null;
@@ -665,7 +698,7 @@
                 return;
             }
 
-            // 发送请求
+            // 发送请求 - 适配api.py接口路径
             console.log('准备发送请求到 /tools/api/generate-testcases/');
             axios.post('/tools/api/generate-testcases/', {
                 requirement: requirement,
@@ -675,40 +708,42 @@
                     'X-CSRFToken': csrfToken,
                     'Content-Type': 'application/json'
                 },
-                timeout: 6000000// 60秒超时
+                timeout: 600000 // 10分钟超时，适应复杂生成
             })
             .then(response => {
                 console.log('请求成功，响应数据:', response.data);
                 const resultDiv = document.getElementById('result');
                 resultDiv.innerHTML = ''; // 清空旧内容
 
-                // 处理响应
+                // 处理响应 - 匹配api.py返回格式
                 if (response.data.error) {
                     showMessage(response.data.error, 'error');
                 } else {
-                    // 构建下载链接
+                    // 创建测试用例展示区域
+                    const caseDisplay = document.createElement('div');
+                    caseDisplay.className = 'test-case-display';
+                    caseDisplay.textContent = response.data.raw_response; // 展示原始响应
+                    resultDiv.appendChild(caseDisplay);
+
+                    // 添加复制按钮
+                    const copyBtn = document.createElement('button');
+                    copyBtn.className = 'btn btn-outline-primary btn-sm copy-btn';
+                    copyBtn.innerHTML = '<i class="fas fa-copy"></i> 复制用例';
+                    copyBtn.onclick = () => copyToClipboard(response.data.raw_response, copyBtn);
+                    resultDiv.appendChild(copyBtn);
+
+                    // 构建下载链接 - 匹配api.py返回的download_url
                     const downloadLinks = document.createElement('div');
                     downloadLinks.className = 'download-links';
 
-                    // 添加.mm文件下载
-                    if (response.data.download_mm_url) {
+                    if (response.data.download_url) {
                         const mmLink = document.createElement('a');
-                        mmLink.href = response.data.download_mm_url;
+                        mmLink.href = response.data.download_url;
                         mmLink.innerHTML = '<i class="fas fa-download"></i> 下载测试用例（FreeMind格式）';
                         mmLink.target = '_blank';
                         downloadLinks.appendChild(mmLink);
                     }
 
-                    // 添加.png预览图
-                    if (response.data.preview_png_url) {
-                        const pngLink = document.createElement('a');
-                        pngLink.href = response.data.preview_png_url;
-                        pngLink.innerHTML = '<i class="fas fa-image"></i> 预览测试用例（图片）';
-                        pngLink.target = '_blank';
-                        downloadLinks.appendChild(pngLink);
-                    }
-
-                    // 显示结果
                     resultDiv.appendChild(downloadLinks);
                     showMessage('测试用例生成成功！', 'success');
                 }
