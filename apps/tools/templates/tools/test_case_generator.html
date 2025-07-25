@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI测试用例生成器</title>
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
-    <!-- 引入Font Awesome图标库 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root {
@@ -221,6 +220,27 @@
             color: var(--text-color);
         }
 
+        .download-links {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .download-links a {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+
+        .download-links a:hover {
+            background-color: var(--primary-dark);
+        }
+
         /* 抖动动画 */
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
@@ -299,10 +319,7 @@
 
         // 页面加载完成后初始化事件绑定
         document.addEventListener('DOMContentLoaded', function() {
-            // 设置默认提示词
             document.getElementById('prompt').placeholder = DEFAULT_PROMPT;
-
-            // 绑定生成按钮点击事件
             const generateBtn = document.getElementById('generateBtn');
             generateBtn.addEventListener('click', generateCases);
             console.log('生成按钮事件已绑定，等待点击...');
@@ -321,8 +338,6 @@
             resultDiv.className = type;
             resultDiv.style.display = 'block';
             resultDiv.style.opacity = '0';
-
-            // 淡入动画
             setTimeout(() => {
                 resultDiv.style.opacity = '1';
             }, 10);
@@ -358,7 +373,6 @@
             // 输入验证
             if (!requirement) {
                 showMessage('请输入产品需求内容', 'error');
-                // 抖动动画提示
                 const reqElement = document.getElementById('requirement');
                 reqElement.style.animation = 'none';
                 setTimeout(() => {
@@ -396,18 +410,42 @@
                     'X-CSRFToken': csrfToken,
                     'Content-Type': 'application/json'
                 },
-                timeout: 600000000  // 无限等待
+                timeout: 60000 // 60秒超时（可根据实际调整）
             })
             .then(response => {
                 console.log('请求成功，响应数据:', response.data);
-                if (response.data.download_url) {
-                    showMessage('测试用例生成成功，即将开始下载...', 'success');
-                    // 延迟下载，让用户看到成功消息
-                    setTimeout(() => {
-                        window.location.href = response.data.download_url;
-                    }, 1000);
+                const resultDiv = document.getElementById('result');
+                resultDiv.innerHTML = ''; // 清空旧内容
+
+                // 处理响应
+                if (response.data.error) {
+                    showMessage(response.data.error, 'error');
                 } else {
-                    showMessage('生成成功，但未找到下载链接', 'success');
+                    // 构建下载链接
+                    const downloadLinks = document.createElement('div');
+                    downloadLinks.className = 'download-links';
+
+                    // 添加.mm文件下载
+                    if (response.data.download_mm_url) {
+                        const mmLink = document.createElement('a');
+                        mmLink.href = response.data.download_mm_url;
+                        mmLink.textContent = '下载测试用例（FreeMind格式）';
+                        mmLink.target = '_blank';
+                        downloadLinks.appendChild(mmLink);
+                    }
+
+                    // 添加.png预览图
+                    if (response.data.preview_png_url) {
+                        const pngLink = document.createElement('a');
+                        pngLink.href = response.data.preview_png_url;
+                        pngLink.textContent = '预览测试用例（图片）';
+                        pngLink.target = '_blank';
+                        downloadLinks.appendChild(pngLink);
+                    }
+
+                    // 显示结果
+                    resultDiv.appendChild(downloadLinks);
+                    showMessage('测试用例生成成功！', 'success');
                 }
             })
             .catch(error => {
@@ -416,14 +454,11 @@
 
                 // 详细错误信息处理
                 if (error.response) {
-                    // 服务器返回错误
                     errorMsg = error.response.data.error ||
                               `服务器错误 (状态码: ${error.response.status})`;
                 } else if (error.request) {
-                    // 无响应错误
                     errorMsg = '未收到服务器响应，请检查网络连接';
                 } else {
-                    // 请求配置错误
                     errorMsg = `请求错误: ${error.message}`;
                 }
 
