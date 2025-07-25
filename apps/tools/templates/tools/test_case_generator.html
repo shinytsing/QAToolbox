@@ -6,6 +6,7 @@
     <title>AI测试用例生成器</title>
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/css/bootstrap.min.css">
     <style>
         :root {
             --primary-color: #3498db;
@@ -18,6 +19,8 @@
             --dark-gray: #7f8c8d;
             --text-color: #2c3e50;
             --shadow: 0 2px 10px rgba(0,0,0,0.1);
+            --card-bg: #ffffff;
+            --card-hover: 0 8px 24px rgba(0,0,0,0.12);
         }
 
         * {
@@ -28,55 +31,79 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 30px 15px;
             background-color: var(--light-gray);
             color: var(--text-color);
             line-height: 1.6;
         }
 
-        #app {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: var(--shadow);
-            transition: transform 0.3s ease;
-        }
-
-        #app:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-        }
-
-        h1 {
-            color: var(--text-color);
+        header {
             text-align: center;
             margin-bottom: 30px;
             padding-bottom: 15px;
             border-bottom: 1px solid var(--medium-gray);
         }
 
+        header h1 {
+            color: var(--primary-color);
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: var(--dark-gray);
+            font-size: 1.1rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            overflow: hidden;
+            border: none;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--card-hover);
+        }
+
+        .card-body {
+            padding: 30px;
+        }
+
+        h2 {
+            color: var(--text-color);
+            margin-bottom: 25px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--medium-gray);
+            font-size: 1.5rem;
+        }
+
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 25px;
         }
 
         label {
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             font-weight: 600;
             color: var(--text-color);
+            font-size: 1rem;
         }
 
         textarea {
             width: 100%;
             padding: 15px;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
             border: 1px solid var(--medium-gray);
-            border-radius: 6px;
+            border-radius: 8px;
             resize: vertical;
             font-family: inherit;
-            font-size: 14px;
+            font-size: 0.95rem;
             transition: border-color 0.3s, box-shadow 0.3s;
         }
 
@@ -87,76 +114,94 @@
         }
 
         #requirement {
-            min-height: 150px;
+            min-height: 160px;
         }
 
-        #prompt {
-            min-height: 100px;
+        #prompt, #defaultPrompt {
+            min-height: 200px;
         }
 
-        button {
+        .btn {
             background-color: var(--primary-color);
             color: white;
             border: none;
             padding: 12px 24px;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 1rem;
             font-weight: 600;
-            transition: background-color 0.3s, transform 0.2s;
-            width: 100%;
-            display: flex;
+            transition: all 0.3s ease;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
         }
 
-        button:hover {
+        .btn:hover {
             background-color: var(--primary-dark);
-            transform: translateY(-1px);
+            transform: translateY(-2px);
+            color: white;
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
         }
 
-        button:active {
-            transform: translateY(1px);
+        .btn:active {
+            transform: translateY(0);
         }
 
-        button:disabled {
+        .btn:disabled {
             background-color: var(--medium-gray);
             cursor: not-allowed;
             transform: none;
+            box-shadow: none;
         }
 
-        #result {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 6px;
+        .btn-outline-primary {
+            background-color: transparent;
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+        }
+
+        .btn-outline-primary:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .result-container {
+            margin-top: 25px;
+            padding: 18px;
+            border-radius: 8px;
             display: none;
-            transition: opacity 0.3s;
+            transition: opacity 0.3s, transform 0.3s;
+            transform: translateY(10px);
+            opacity: 0;
+        }
+
+        .result-container.show {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
         }
 
         .error {
             background-color: #fdecea;
             color: var(--error-color);
-            display: block;
             border-left: 4px solid var(--error-color);
         }
 
         .success {
             background-color: #eafaf1;
             color: var(--success-color);
-            display: block;
             border-left: 4px solid var(--success-color);
         }
 
         .loading {
             background-color: #f1f9f7;
             color: var(--loading-color);
-            display: block;
             border-left: 4px solid var(--loading-color);
         }
 
         .hint {
-            font-size: 12px;
+            font-size: 0.85rem;
             color: var(--dark-gray);
             margin: -5px 0 15px 0;
             font-style: italic;
@@ -182,27 +227,26 @@
             background: none;
             border: none;
             padding: 0;
-            font-size: 12px;
+            font-size: 0.85rem;
             cursor: pointer;
             text-decoration: underline;
             margin-top: 5px;
-            width: auto;
-            display: inline;
+            transition: color 0.3s;
         }
 
         .example-toggle:hover {
             color: var(--primary-dark);
             background: none;
-            transform: none;
         }
 
         .examples {
             margin-top: 10px;
-            padding: 10px;
+            padding: 15px;
             background-color: #f9f9f9;
-            border-radius: 4px;
-            font-size: 13px;
+            border-radius: 6px;
+            font-size: 0.85rem;
             display: none;
+            border: 1px solid #eee;
         }
 
         .examples.active {
@@ -210,8 +254,8 @@
         }
 
         .examples h4 {
-            font-size: 14px;
-            margin-bottom: 8px;
+            font-size: 0.95rem;
+            margin-bottom: 10px;
             color: var(--text-color);
         }
 
@@ -221,24 +265,30 @@
         }
 
         .download-links {
-            margin-top: 10px;
+            margin-top: 15px;
             display: flex;
-            gap: 10px;
+            gap: 12px;
             flex-wrap: wrap;
         }
 
         .download-links a {
             background-color: var(--primary-color);
             color: white;
-            padding: 8px 16px;
-            border-radius: 4px;
+            padding: 10px 18px;
+            border-radius: 6px;
             text-decoration: none;
-            font-size: 14px;
-            transition: background-color 0.3s;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .download-links a:hover {
             background-color: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(52, 152, 219, 0.2);
+            color: white;
         }
 
         /* 抖动动画 */
@@ -247,57 +297,130 @@
             10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
             20%, 40%, 60%, 80% { transform: translateX(5px); }
         }
+
+        .shake {
+            animation: shake 0.5s;
+        }
+
+        .prompt-section {
+            margin-top: 15px;
+        }
+
+        .prompt-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .collapsible-content.open {
+            max-height: 1000px;
+            transition: max-height 0.6s ease-in;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .action-buttons {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
-    <div id="app">
-        <h1>AI测试用例生成器</h1>
+    <header>
+        <h1><i class="fas fa-robot"></i> AI测试用例生成器</h1>
+        <p>智能生成全面、系统的测试用例，提升测试效率</p>
+    </header>
 
-        <div class="form-group">
-            <label for="requirement">产品需求 <span style="color: var(--error-color)">*</span></label>
-            <textarea
-                id="requirement"
-                placeholder="请详细描述产品需求，例如：用户登录功能，支持手机号和邮箱登录，包含记住密码选项..."
-                required
-            ></textarea>
-            <button class="example-toggle" onclick="toggleExamples('requirementExamples')">
-                查看示例
-            </button>
-            <div id="requirementExamples" class="examples">
-                <h4>需求示例：</h4>
-                <p>1. 用户注册功能：支持手机号注册，需输入验证码，密码长度至少8位，包含字母和数字</p>
-                <p>2. 购物车功能：可添加商品、修改数量、删除商品，支持勾选商品结算</p>
+    <div class="card">
+        <div class="card-body">
+            <h2>生成测试用例</h2>
+
+            <div class="form-group">
+                <label for="requirement">产品需求 <span style="color: var(--error-color)">*</span></label>
+                <textarea
+                    id="requirement"
+                    placeholder="请详细描述产品需求，例如：用户登录功能，支持手机号和邮箱登录，包含记住密码选项..."
+                    required
+                ></textarea>
+                <button class="example-toggle" onclick="toggleExamples('requirementExamples')">
+                    <i class="fas fa-lightbulb"></i> 查看示例
+                </button>
+                <div id="requirementExamples" class="examples">
+                    <h4>需求示例：</h4>
+                    <p>1. 用户注册功能：支持手机号注册，需输入验证码，密码长度至少8位，包含字母和数字</p>
+                    <p>2. 购物车功能：可添加商品、修改数量、删除商品，支持勾选商品结算</p>
+                </div>
             </div>
+
+            <div class="form-group">
+                <div class="prompt-header">
+                    <label for="prompt">自定义提示词</label>
+                    <button class="btn btn-outline-primary btn-sm" id="toggleDefaultPrompt">
+                        <i class="fas fa-cog"></i> 查看/编辑默认提示词
+                    </button>
+                </div>
+                <textarea
+                    id="prompt"
+                    placeholder="请输入自定义提示词，留空将使用默认提示词模板。"
+                ></textarea>
+                <div class="hint">
+                    提示：留空将使用默认提示词模板，生成包含多级结构的测试用例
+                </div>
+                <button class="example-toggle" onclick="toggleExamples('promptExamples')">
+                    <i class="fas fa-lightbulb"></i> 查看提示词示例
+                </button>
+                <div id="promptExamples" class="examples">
+                    <h4>提示词示例：</h4>
+                    <p>1. 根据{requirement}生成全面的测试用例，包括功能测试、边界测试和异常测试，使用## 分类 ### 子项 - 用例的格式</p>
+                    <p>2. 针对{requirement}设计用户场景测试用例，每个用例包含前置条件、测试步骤和预期结果</p>
+                </div>
+
+                <!-- 默认提示词编辑区域 -->
+                <div class="prompt-section collapsible-content" id="defaultPromptSection">
+                    <label for="defaultPrompt">默认提示词模板</label>
+                    <textarea id="defaultPrompt"></textarea>
+                    <div class="hint">
+                        提示：修改后将应用于后续生成操作，{requirement}为需求占位符请保留
+                    </div>
+                    <button class="btn btn-outline-primary btn-sm" id="saveDefaultPrompt">
+                        <i class="fas fa-save"></i> 保存默认提示词
+                    </button>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button id="resetBtn" class="btn btn-outline-primary">
+                    <i class="fas fa-undo"></i> 重置
+                </button>
+                <button id="generateBtn" class="btn">
+                    <i class="fas fa-magic"></i> 生成测试用例
+                </button>
+            </div>
+
+            <div id="result" class="result-container"></div>
         </div>
-
-        <div class="form-group">
-            <label for="prompt">自定义提示词</label>
-            <textarea
-                id="prompt"
-                placeholder="请输入自定义提示词，留空将使用默认提示词模板，可在按钮中查看默认提示词模板。"
-            ></textarea>
-            <div class="hint">
-                提示：留空将使用默认提示词模板，生成包含多级结构的测试用例
-            </div>
-            <button class="example-toggle" onclick="toggleExamples('promptExamples')">
-                查看示例
-            </button>
-            <div id="promptExamples" class="examples">
-                <h4>提示词示例：</h4>
-                <p>1. 根据{requirement}生成全面的测试用例，包括功能测试、边界测试和异常测试，使用## 分类 ### 子项 - 用例的格式</p>
-                <p>2. 针对{requirement}设计用户场景测试用例，每个用例包含前置条件、测试步骤和预期结果</p>
-            </div>
-        </div>
-
-        <button id="generateBtn">
-            <i class="fas fa-magic"></i> 生成测试用例
-        </button>
-        <div id="result"></div>
     </div>
 
     <script>
         // 默认提示词 - 完整有效且结构化
-const DEFAULT_PROMPT = `根据以下产品需求生成全球化APP全面可执行的测试用例集，需同时覆盖APP特性、国际化场景、埋点验证、AB实验及版本测试:
+        let DEFAULT_PROMPT = `根据以下产品需求生成全球化APP全面可执行的测试用例集，需同时覆盖APP特性、国际化场景、埋点验证、AB实验及版本测试:
 {requirement}
 
 ## 结构要求
@@ -307,7 +430,7 @@ const DEFAULT_PROMPT = `根据以下产品需求生成全球化APP全面可执�
    - 埋点与数据分析测试范围
    - AB实验测试范围
    - 版本版本测试范围
-   - 你可以尽可能的丰富用例，穷尽可能的场景，但不要过分设计。
+   - 你可以尽可能的丰富用例，根据不同的测试策略穷尽可能的场景。
 
 ## 用例要素
 每个测试用例必须包含:
@@ -406,13 +529,19 @@ const DEFAULT_PROMPT = `根据以下产品需求生成全球化APP全面可执�
 - 复杂场景可附加流程图或状态转换说明
 - 结尾提供需求覆盖率分析，含各专项测试覆盖情况`;
 
-
-        // 页面加载完成后初始化事件绑定
+        // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('prompt').placeholder = DEFAULT_PROMPT;
-            const generateBtn = document.getElementById('generateBtn');
-            generateBtn.addEventListener('click', generateCases);
-            console.log('生成按钮事件已绑定，等待点击...');
+            // 初始化默认提示词文本框
+            const defaultPromptEl = document.getElementById('defaultPrompt');
+            defaultPromptEl.value = DEFAULT_PROMPT;
+
+            // 绑定按钮事件
+            document.getElementById('generateBtn').addEventListener('click', generateCases);
+            document.getElementById('toggleDefaultPrompt').addEventListener('click', toggleDefaultPrompt);
+            document.getElementById('saveDefaultPrompt').addEventListener('click', saveDefaultPrompt);
+            document.getElementById('resetBtn').addEventListener('click', resetForm);
+
+            console.log('生成器初始化完成，等待操作...');
         });
 
         // 切换示例显示/隐藏
@@ -421,16 +550,67 @@ const DEFAULT_PROMPT = `根据以下产品需求生成全球化APP全面可执�
             examples.classList.toggle('active');
         }
 
+        // 切换默认提示词区域显示/隐藏
+        function toggleDefaultPrompt() {
+            const section = document.getElementById('defaultPromptSection');
+            section.classList.toggle('open');
+            const btn = document.getElementById('toggleDefaultPrompt');
+
+            if (section.classList.contains('open')) {
+                btn.innerHTML = '<i class="fas fa-chevron-up"></i> 收起默认提示词';
+            } else {
+                btn.innerHTML = '<i class="fas fa-cog"></i> 查看/编辑默认提示词';
+            }
+        }
+
+        // 保存默认提示词
+        function saveDefaultPrompt() {
+            const defaultPromptEl = document.getElementById('defaultPrompt');
+            const newPrompt = defaultPromptEl.value.trim();
+
+            if (!newPrompt) {
+                showMessage('提示词不能为空', 'error');
+                defaultPromptEl.classList.add('shake');
+                setTimeout(() => defaultPromptEl.classList.remove('shake'), 500);
+                return;
+            }
+
+            if (!newPrompt.includes('{requirement}')) {
+                if (!confirm('提示词中未包含{requirement}占位符，这将导致无法正确插入产品需求。是否继续保存？')) {
+                    return;
+                }
+            }
+
+            DEFAULT_PROMPT = newPrompt;
+            showMessage('默认提示词已保存', 'success');
+
+            // 短暂高亮提示
+            const saveBtn = document.getElementById('saveDefaultPrompt');
+            const originalText = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<i class="fas fa-check"></i> 已保存';
+            saveBtn.disabled = true;
+
+            setTimeout(() => {
+                saveBtn.innerHTML = originalText;
+                saveBtn.disabled = false;
+            }, 2000);
+        }
+
+        // 重置表单
+        function resetForm() {
+            if (confirm('确定要重置所有输入内容吗？')) {
+                document.getElementById('requirement').value = '';
+                document.getElementById('prompt').value = '';
+                document.getElementById('result').classList.remove('show');
+            }
+        }
+
         // 显示消息提示
         function showMessage(text, type) {
             const resultDiv = document.getElementById('result');
             resultDiv.textContent = text;
-            resultDiv.className = type;
-            resultDiv.style.display = 'block';
-            resultDiv.style.opacity = '0';
-            setTimeout(() => {
-                resultDiv.style.opacity = '1';
-            }, 10);
+            resultDiv.className = `result-container ${type}`;
+            resultDiv.classList.add('show');
         }
 
         // 获取Cookie（用于CSRF验证）
@@ -456,7 +636,6 @@ const DEFAULT_PROMPT = `根据以下产品需求生成全球化APP全面可执�
             // 获取DOM元素
             const requirement = document.getElementById('requirement').value.trim();
             let prompt = document.getElementById('prompt').value.trim();
-            const resultDiv = document.getElementById('result');
             const generateBtn = document.getElementById('generateBtn');
             const originalBtnText = generateBtn.innerHTML;
 
@@ -464,10 +643,8 @@ const DEFAULT_PROMPT = `根据以下产品需求生成全球化APP全面可执�
             if (!requirement) {
                 showMessage('请输入产品需求内容', 'error');
                 const reqElement = document.getElementById('requirement');
-                reqElement.style.animation = 'none';
-                setTimeout(() => {
-                    reqElement.style.animation = 'shake 0.5s';
-                }, 10);
+                reqElement.classList.add('shake');
+                setTimeout(() => reqElement.classList.remove('shake'), 500);
                 return;
             }
 
@@ -500,7 +677,7 @@ const DEFAULT_PROMPT = `根据以下产品需求生成全球化APP全面可执�
                     'X-CSRFToken': csrfToken,
                     'Content-Type': 'application/json'
                 },
-                timeout: 60000 // 60秒超时（可根据实际调整）
+                timeout: 60000 // 60秒超时
             })
             .then(response => {
                 console.log('请求成功，响应数据:', response.data);
@@ -519,7 +696,7 @@ const DEFAULT_PROMPT = `根据以下产品需求生成全球化APP全面可执�
                     if (response.data.download_mm_url) {
                         const mmLink = document.createElement('a');
                         mmLink.href = response.data.download_mm_url;
-                        mmLink.textContent = '下载测试用例（FreeMind格式）';
+                        mmLink.innerHTML = '<i class="fas fa-download"></i> 下载测试用例（FreeMind格式）';
                         mmLink.target = '_blank';
                         downloadLinks.appendChild(mmLink);
                     }
@@ -528,7 +705,7 @@ const DEFAULT_PROMPT = `根据以下产品需求生成全球化APP全面可执�
                     if (response.data.preview_png_url) {
                         const pngLink = document.createElement('a');
                         pngLink.href = response.data.preview_png_url;
-                        pngLink.textContent = '预览测试用例（图片）';
+                        pngLink.innerHTML = '<i class="fas fa-image"></i> 预览测试用例（图片）';
                         pngLink.target = '_blank';
                         downloadLinks.appendChild(pngLink);
                     }
