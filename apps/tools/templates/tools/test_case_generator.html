@@ -276,9 +276,33 @@
     </div>
 
     <script>
+        // 默认提示词 - 完整有效且结构化
+        const DEFAULT_PROMPT = `请根据以下产品需求生成全面、详细的测试用例:
+{requirement}
+
+测试用例应包含以下内容:
+1. 按功能模块或场景进行分类
+2. 每个测试用例需包含:
+   - 测试ID
+   - 测试场景
+   - 前置条件
+   - 测试步骤(清晰的操作序列)
+   - 预期结果
+   - 重要程度(高/中/低)
+3. 需覆盖以下测试类型:
+   - 功能测试(正常流程)
+   - 边界值测试
+   - 异常场景测试
+   - 兼容性考虑(如适用)
+
+请使用Markdown格式输出，使用## 作为主要分类，### 作为子分类，确保结构清晰、层次分明，便于导入测试管理工具。`;
+
         // 页面加载完成后初始化事件绑定
         document.addEventListener('DOMContentLoaded', function() {
-            // 绑定生成按钮点击事件（关键修复）
+            // 设置默认提示词
+            document.getElementById('prompt').placeholder = DEFAULT_PROMPT;
+
+            // 绑定生成按钮点击事件
             const generateBtn = document.getElementById('generateBtn');
             generateBtn.addEventListener('click', generateCases);
             console.log('生成按钮事件已绑定，等待点击...');
@@ -326,7 +350,7 @@
 
             // 获取DOM元素
             const requirement = document.getElementById('requirement').value.trim();
-            const prompt = document.getElementById('prompt').value.trim();
+            let prompt = document.getElementById('prompt').value.trim();
             const resultDiv = document.getElementById('result');
             const generateBtn = document.getElementById('generateBtn');
             const originalBtnText = generateBtn.innerHTML;
@@ -343,6 +367,11 @@
                 return;
             }
 
+            // 如果用户未输入提示词，使用默认提示词
+            if (!prompt) {
+                prompt = DEFAULT_PROMPT;
+            }
+
             // 显示加载状态
             showMessage('正在生成测试用例，请稍候...', 'loading');
             generateBtn.disabled = true;
@@ -357,9 +386,9 @@
                 return;
             }
 
-            // 发送请求（关键修复）
-            console.log('准备发送请求到 /tool/api/generate-testcases/');
-            axios.post('/tool/api/generate-testcases/', {
+            // 发送请求
+            console.log('准备发送请求到 /tools/api/generate-testcases/');
+            axios.post('/tools/api/generate-testcases/', {
                 requirement: requirement,
                 prompt: prompt
             }, {
@@ -407,9 +436,5 @@
             });
         }
     </script>
-
-
-
-
 </body>
 </html>
