@@ -12,7 +12,6 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from django.conf import settings
 from django.core.files import File
-import datetime  # 顶部导入
 import logging
 import re
 from datetime import datetime
@@ -41,16 +40,31 @@ class GenerateTestCasesAPI(APIView):
 
             logger.info(
                 f"用户 {request.user.username} 发起测试用例生成请求，"
-                f"需求长度: {len(request.data.get('requirement', ''))}，"
+                f"需求长度: {len(requirement)}，"
                 f"时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}"
             )
-            # 验证需求参数（允许prompt为空，使用默认值）
+
+            # 验证需求参数
             if not requirement:
                 logger.warning("测试用例生成请求缺少requirement参数")
                 return Response(
                     {'error': '请输入产品需求内容'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+
+            # 处理文件名（使用用户需求和时间）
+            # 1. 截取需求前20个字符作为标识（更长更具辨识度）
+            truncated_req = requirement[:20].strip() if requirement else "default"
+
+            # 2. 清理文件名中的特殊字符（替换为下划线）
+            invalid_chars = r'[\\/*?:"<>| ]'  # 包含空格，统一替换
+            cleaned_req = re.sub(invalid_chars, '_', truncated_req)
+
+            # 3. 生成时间戳（使用下划线连接，不含空格）
+            current_time = datetime.now().strftime("%Y%m%d_%H%M%S")  # 格式：20250726_153045
+
+            # 4. 组合文件名并添加.mm扩展名
+            outfile_name = f"{cleaned_req}_{current_time}.mm"
 
             # 如果用户未提供prompt，使用默认模板
             final_prompt = user_prompt if user_prompt else self.DEFAULT_PROMPT.format(requirement=requirement)
@@ -75,14 +89,14 @@ class GenerateTestCasesAPI(APIView):
             output_dir = os.path.join(settings.MEDIA_ROOT, 'tool_outputs')
             os.makedirs(output_dir, exist_ok=True)
 
-            # 5. 创建FreeMind格式文件（飞书兼容）
+            # 5. 创建FreeMind格式文件
             with tempfile.NamedTemporaryFile(suffix='.mm', delete=False, mode='w', encoding='utf-8') as tmp:
                 # 生成FreeMind XML内容
                 mindmap_xml = self._generate_freemind(test_cases)
                 tmp.write(mindmap_xml)
                 tmp.flush()  # 确保内容写入磁盘
 
-                # 6. 保存到模型
+                # 6. 保存到模型（使用自定义文件名）
                 log = ToolUsageLog.objects.create(
                     user=request.user,
                     tool_type='TEST_CASE',
@@ -94,25 +108,18 @@ class GenerateTestCasesAPI(APIView):
 
                 # 使用Django的File类处理文件保存
                 with open(tmp.name, 'rb') as f:
-                    log.output_file.save(os.path.basename(tmp.name), File(f), save=True)
+                    log.output_file.save(outfile_name, File(f), save=True)
 
                 # 清理临时文件
                 os.unlink(tmp.name)
 
-            # 1. 截取前10个字符（处理空字符串情况）
-            truncated_req = requirement[:10].strip() if requirement else "default"
+            # 验证文件是否成功保存
+            saved_file_path = os.path.join(output_dir, outfile_name)
+            if os.path.exists(saved_file_path):
+                logger.info(f"用户 {request.user.username} 测试用例生成成功，文件: {saved_file_path}")
+            else:
+                logger.warning(f"用户 {request.user.username} 测试用例生成成功，但文件未找到: {saved_file_path}")
 
-            # 2. 清理文件名中的特殊字符（移除或替换不允许的字符）
-            invalid_chars = r'[\\/*?:"<>|]'  # 操作系统不允许的文件名字符
-            cleaned_req = re.sub(invalid_chars, '_', truncated_req)
-
-            # 3. 生成 yyyy-MM-dd hh:mm:ss 格式的时间（替换冒号为合法字符）
-            current_time = datetime.now().strftime("%Y-%m-%d %H-%M-%S")  # 用 - 代替 :
-
-            # 4. 组合文件名（示例：用户登录功能_2025-07-26 14-30-45）
-            outfile_name = f"{cleaned_req}_{current_time}"
-
-            logger.info(f"用户 {request.user.username} 测试用例生成成功，文件: {outfile_name}")
             return Response({
                 'download_url': f'/tools/download/{outfile_name}',
                 'log_id': log.id,
@@ -124,7 +131,7 @@ class GenerateTestCasesAPI(APIView):
                 f"用户 {request.user.username} 测试用例生成失败，"
                 f"耗时: {(datetime.now() - start_time).total_seconds()}秒，"
                 f"错误: {str(e)}",
-                exc_info=True  # 记录完整堆栈信息
+                exc_info=True
             )
 
             return Response(
