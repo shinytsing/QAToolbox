@@ -10,16 +10,12 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
-import os
-from pathlib import Path
-import sys
-import os
-from pathlib import Path
-
-from apps.tools.utils import API_RATE_LIMIT
 # 在文件最顶部添加
 import os
+import sys
+from pathlib import Path
 from dotenv import load_dotenv
+from apps.tools.utils import API_RATE_LIMIT
 
 # 加载.env文件
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env.py'))
