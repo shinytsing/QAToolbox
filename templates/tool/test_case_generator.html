@@ -9,16 +9,17 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root {
-            --primary-color: #3498db;
-            --primary-dark: #2980b9;
-            --success-color: #27ae60;
-            --error-color: #e74c3c;
-            --loading-color: #2980b9;
-            --light-gray: #f5f7fa;
-            --medium-gray: #ddd;
-            --dark-gray: #7f8c8d;
-            --text-color: #2c3e50;
-            --shadow: 0 2px 10px rgba(0,0,0,0.1);
+            /* 统一与主页色调（假设主页为深色主题） */
+            --primary-color: #007bff; /* 主色调与主页一致 */
+            --primary-dark: #0056b3;
+            --success-color: #28a745;
+            --error-color: #dc3545;
+            --loading-color: #0069d9;
+            --light-gray: #343a40; /* 深色背景 */
+            --medium-gray: #495057;
+            --dark-gray: #adb5bd;
+            --text-color: #f8f9fa; /* 浅色文字 */
+            --shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
 
         * {
@@ -38,7 +39,7 @@
         }
 
         #app {
-            background: white;
+            background: #212529; /* 深色卡片背景 */
             padding: 30px;
             border-radius: 10px;
             box-shadow: var(--shadow);
@@ -47,7 +48,7 @@
 
         #app:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
         }
 
         h1 {
@@ -79,12 +80,14 @@
             font-family: inherit;
             font-size: 14px;
             transition: border-color 0.3s, box-shadow 0.3s;
+            background-color: #343a40;
+            color: var(--text-color);
         }
 
         textarea:focus {
             outline: none;
             border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
         }
 
         #requirement {
@@ -93,6 +96,43 @@
 
         #prompt {
             min-height: 100px;
+        }
+
+        /* 默认提示词区域样式 */
+        #defaultPromptContainer {
+            margin: 15px 0;
+            border: 1px dashed var(--medium-gray);
+            border-radius: 6px;
+            padding: 10px;
+        }
+
+        #defaultPromptText {
+            min-height: 120px;
+            font-size: 13px;
+        }
+
+        .toggle-section {
+            margin-bottom: 8px;
+        }
+
+        .toggle-btn {
+            color: var(--primary-color);
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: underline;
+            width: auto;
+            display: inline;
+            justify-content: flex-start;
+            gap: 5px;
+        }
+
+        .toggle-btn:hover {
+            color: #66b0ff;
+            background: none;
+            transform: none;
         }
 
         button {
@@ -136,21 +176,21 @@
         }
 
         .error {
-            background-color: #fdecea;
+            background-color: #492424;
             color: var(--error-color);
             display: block;
             border-left: 4px solid var(--error-color);
         }
 
         .success {
-            background-color: #eafaf1;
+            background-color: #244924;
             color: var(--success-color);
             display: block;
             border-left: 4px solid var(--success-color);
         }
 
         .loading {
-            background-color: #f1f9f7;
+            background-color: #243a49;
             color: var(--loading-color);
             display: block;
             border-left: 4px solid var(--loading-color);
@@ -192,7 +232,7 @@
         }
 
         .example-toggle:hover {
-            color: var(--primary-dark);
+            color: #66b0ff;
             background: none;
             transform: none;
         }
@@ -200,7 +240,7 @@
         .examples {
             margin-top: 10px;
             padding: 10px;
-            background-color: #f9f9f9;
+            background-color: #343a40;
             border-radius: 4px;
             font-size: 13px;
             display: none;
@@ -254,19 +294,29 @@
             <label for="prompt">自定义提示词</label>
             <textarea
                 id="prompt"
-                placeholder="请输入自定义提示词（使用{requirement}作为需求占位符），例如：根据{requirement}生成详细的测试用例，包含测试场景、测试步骤和预期结果..."
+                placeholder="请输入自定义提示词（使用{requirement}作为需求占位符），例如：根据{requirement}生成详细的测试用例..."
             ></textarea>
             <div class="hint">
                 提示：留空将使用默认提示词模板，生成包含多级结构的测试用例
             </div>
-            <button class="example-toggle" onclick="toggleExamples('promptExamples')">
-                查看示例
-            </button>
-            <div id="promptExamples" class="examples">
-                <h4>提示词示例：</h4>
-                <p>1. 根据{requirement}生成全面的测试用例，包括功能测试、边界测试和异常测试，使用## 分类 ### 子项 - 用例的格式</p>
-                <p>2. 针对{requirement}设计用户场景测试用例，每个用例包含前置条件、测试步骤和预期结果</p>
+
+            <!-- 默认提示词查看/编辑区域 -->
+            <div class="toggle-section">
+                <button class="toggle-btn" onclick="toggleDefaultPrompt()">
+                    <i class="fas fa-cog"></i> 查看/编辑默认提示词模板
+                </button>
             </div>
+            <div id="defaultPromptContainer" style="display: none;">
+                <textarea
+                    id="defaultPromptText"
+                    placeholder="默认提示词模板..."
+                ></textarea>
+                <div class="hint">
+                    提示：修改后将影响所有未输入自定义提示词的生成结果
+                </div>
+            </div>
+
+
         </div>
 
         <button id="generateBtn">
@@ -277,7 +327,7 @@
 
     <script>
         // 默认提示词 - 完整有效且结构化
-        const DEFAULT_PROMPT = `请根据以下产品需求生成全面、详细的测试用例:
+        let DEFAULT_PROMPT = `请根据以下产品需求生成全面、详细的测试用例:
 {requirement}
 
 测试用例应包含以下内容:
@@ -299,14 +349,21 @@
 
         // 页面加载完成后初始化事件绑定
         document.addEventListener('DOMContentLoaded', function() {
-            // 设置默认提示词
-            document.getElementById('prompt').placeholder = DEFAULT_PROMPT;
+            // 初始化默认提示词文本框
+            const defaultPromptEl = document.getElementById('defaultPromptText');
+            defaultPromptEl.value = DEFAULT_PROMPT;
 
             // 绑定生成按钮点击事件
             const generateBtn = document.getElementById('generateBtn');
             generateBtn.addEventListener('click', generateCases);
             console.log('生成按钮事件已绑定，等待点击...');
         });
+
+        // 切换默认提示词区域显示/隐藏
+        function toggleDefaultPrompt() {
+            const container = document.getElementById('defaultPromptContainer');
+            container.style.display = container.style.display === 'none' ? 'block' : 'none';
+        }
 
         // 切换示例显示/隐藏
         function toggleExamples(id) {
@@ -354,6 +411,8 @@
             const resultDiv = document.getElementById('result');
             const generateBtn = document.getElementById('generateBtn');
             const originalBtnText = generateBtn.innerHTML;
+            // 获取用户可能修改的默认提示词
+            const customDefaultPrompt = document.getElementById('defaultPromptText').value.trim();
 
             // 输入验证
             if (!requirement) {
@@ -367,9 +426,9 @@
                 return;
             }
 
-            // 如果用户未输入提示词，使用默认提示词
+            // 如果用户未输入提示词，使用（可能被修改的）默认提示词
             if (!prompt) {
-                prompt = DEFAULT_PROMPT;
+                prompt = customDefaultPrompt || DEFAULT_PROMPT;
             }
 
             // 显示加载状态
@@ -386,9 +445,9 @@
                 return;
             }
 
-            // 发送请求
+
             console.log('准备发送请求到 /tools/api/generate-testcases/');
-            axios.post('/tools/api/generate-testcases/', {
+            axios.post('/tools/api/generate-testcases/', {  // 修正后的URL
                 requirement: requirement,
                 prompt: prompt
             }, {
