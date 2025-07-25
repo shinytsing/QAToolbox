@@ -383,9 +383,7 @@
                 <div class="hint">
                     提示：留空将使用默认提示词模板，生成包含多级结构的测试用例
                 </div>
-                <button class="example-toggle" onclick="toggleExamples('promptExamples')">
-                    <i class="fas fa-lightbulb"></i> 查看提示词示例
-                </button>
+
                 <div id="promptExamples" class="examples">
                     <h4>提示词示例：</h4>
                     <p>1. 根据{requirement}生成全面的测试用例，包括功能测试、边界测试和异常测试，使用## 分类 ### 子项 - 用例的格式</p>
@@ -677,7 +675,7 @@
                     'X-CSRFToken': csrfToken,
                     'Content-Type': 'application/json'
                 },
-                timeout: 60000 // 60秒超时
+                timeout: 6000000// 60秒超时
             })
             .then(response => {
                 console.log('请求成功，响应数据:', response.data);

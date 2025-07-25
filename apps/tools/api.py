@@ -2,8 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from .models import ToolUsageLog
-from .serializers import ToolUsageLogSerializer
+from .models import ToolUsageLog  # 正确的模型导入路径Z
 from .utils import DeepSeekClient
 import tempfile
 import os
@@ -23,17 +22,28 @@ logger = logging.getLogger(__name__)
 class GenerateTestCasesAPI(APIView):
     permission_classes = [IsAuthenticated]
 
-    # 提示词模板调整为匹配目标格式
-    DEFAULT_PROMPT = """作为资深测试工程师，请根据以下产品需求生成全面的测试用例，格式要求如下：
-1. 使用#号层级结构组织模块（# 一级模块，## 二级功能，### 三级子功能）
-2. 每个测试用例包含：
-   - 测试ID（格式：XXX_001）
-   - 测试场景
-   - 前置条件（可包含列表项）
-   - 测试步骤（可包含列表项）
-   - 预期结果（可包含列表项）
-   - 重要程度
-3. 测试用例使用####标记开头
+    # 优化优化提示词模板，明确输出格式要求
+    DEFAULT_PROMPT = """作为为资深测试工程师，请根据以下产品需求生成全面的测试用例，严格严格格遵循格式要求：
+1. 层级结构：
+   - # 一级模块（如：用户管理）
+   - ## 二级功能（如：登录功能）
+   - ### 三级子功能（如：密码登录）
+
+2. 测试用例格式（每个用例必须以####开头）：
+   #### 测试ID: [模块缩写]_XXX（如：USR_LOGIN_001）
+   - 测试场景: [清晰描述测试场景]
+   - 前置条件:
+     1. [条件1]
+     2. [条件2]
+   - 测试步骤:
+     1. [步骤1]
+     2. [步骤2]
+   - 预期结果:
+     1. [结果1]
+     2. [结果2]
+   - 重要程度: [高/中/低]
+
+3. 必须包含的测试类型：功能测试、边界测试、异常测试
 
 产品需求：{requirement}"""
 
@@ -68,7 +78,12 @@ class GenerateTestCasesAPI(APIView):
             # 调用DeepSeek API生成测试用例
             try:
                 deepseek = DeepSeekClient()
-                raw_response = deepseek.generate_test_cases(requirement, final_prompt)
+                # 增加格式约束参数
+                raw_response = deepseek.generate_test_cases(
+                    requirement,
+                    final_prompt
+                    # 移除format_check参数，与utils.py保持兼容
+                )
 
                 # 终端打印完整响应
                 print("\n" + "=" * 80)
@@ -79,6 +94,11 @@ class GenerateTestCasesAPI(APIView):
 
                 if not raw_response:
                     raise ValueError("未从API获取到有效响应")
+
+                # 验证API返回格式
+                if not self._validate_response_format(raw_response):
+                    raise ValueError("API返回内容不符合格式要求，请重试")
+
             except Exception as e:
                 logger.error(f"DeepSeek API调用失败: {str(e)}", exc_info=True)
                 return Response(
@@ -86,7 +106,7 @@ class GenerateTestCasesAPI(APIView):
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
 
-            # 解析API响应（适配微信红包测试用例格式）
+            # 解析API响应（增强版解析器）
             test_cases = self._parse_test_cases(raw_response)
 
             # 确保输出目录存在
@@ -105,7 +125,8 @@ class GenerateTestCasesAPI(APIView):
                     tool_type='TEST_CASE',
                     input_data=json.dumps({
                         'requirement': requirement,
-                        'prompt': final_prompt
+                        'prompt': final_prompt,
+                        'generation_time': (datetime.now() - start_time).total_seconds()
                     })
                 )
 
@@ -116,30 +137,78 @@ class GenerateTestCasesAPI(APIView):
 
             # 验证文件是否成功保存
             saved_file_path = os.path.join(output_dir, outfile_name)
-            if os.path.exists(saved_file_path):
-                logger.info(f"用户 {request.user.username} 测试用例生成成功，文件: {saved_file_path}")
-            else:
-                logger.warning(f"用户 {request.user.username} 测试用例生成成功，但文件未找到: {saved_file_path}")
+            file_status = "存在" if os.path.exists(saved_file_path) else "不存在"
+            logger.info(
+                f"用户 {request.user.username} 测试用例生成成功，"
+                f"耗时: {(datetime.now() - start_time).total_seconds():.2f}秒，"
+                f"文件: {saved_file_path} ({file_status})"
+            )
 
-            return Response({
-                'download_url': f'/tools/download/{outfile_name}',
+            # 构建更详细的响应数据
+            response_data = {
+                'status': 'success',
+                'message': '测试用例生成成功',
+                'download_url': f'/tools/download/{outfile_name}',  # 修正URL路径，与urls.py保持一致
                 'log_id': log.id,
+                'metadata': {
+                    'generation_time': f"{(datetime.now() - start_time).total_seconds():.2f}秒",
+                    'case_count': self._count_test_cases(test_cases),
+                    'module_count': len(test_cases.get('levels', []))
+                },
                 'raw_response': raw_response,
                 'structured_test_cases': test_cases
-            })
+            }
+
+            return Response(response_data, status=status.HTTP_200_OK)
 
         except Exception as e:
+            # 处理start_time可能未定义的情况
+            duration = (datetime.now() - start_time).total_seconds() if 'start_time' in locals() else 0
             logger.error(
                 f"用户 {request.user.username} 测试用例生成失败，"
-                f"耗时: {(datetime.now() - start_time).total_seconds()}秒，"
+                f"耗时: {duration:.2f}秒，"
                 f"错误: {str(e)}",
                 exc_info=True
             )
 
             return Response(
-                {'error': f'服务器处理失败: {str(e)}'},
+                {
+                    'status': 'error',
+                    'error': f'服务器处理失败: {str(e)}',
+                    'details': str(e) if settings.DEBUG else None
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    def _validate_response_format(self, raw_response):
+        """验证API返回内容是否符合格式要求"""
+        # 检查是否包含至少一个测试用例
+        if '#### 测试ID:' not in raw_response:
+            logger.warning("API返回缺少测试用例标记")
+            return False
+
+        # 检查是否包含层级结构
+        if '#' not in raw_response:
+            logger.warning("API返回缺少层级结构")
+            return False
+
+        # 检查测试用例是否包含必要字段
+        case_sections = re.split(r'#### 测试ID:', raw_response)[1:]
+        for section in case_sections:
+            if '测试场景:' not in section or '测试步骤:' not in section or '预期结果:' not in section:
+                logger.warning(f"测试用例缺少必要字段: {section[:100]}...")
+                return False
+
+        return True
+
+    def _count_test_cases(self, test_cases):
+        """统计测试用例总数"""
+        count = 0
+        for level1 in test_cases.get('levels', []):
+            for level2 in level1.get('level2', []):
+                for level3 in level2.get('level3', []):
+                    count += len(level3.get('cases', []))
+        return count
 
     def _clean_text(self, text):
         """清除特殊字符但保留必要格式"""
@@ -150,7 +219,7 @@ class GenerateTestCasesAPI(APIView):
         return cleaned
 
     def _parse_test_cases(self, raw_response):
-        """解析微信红包测试用例格式，保持层级结构"""
+        """增强版解析器，提高格式兼容性"""
         parsed_data = {
             "title": "测试用例集",
             "levels": []  # 存储一级模块
@@ -163,6 +232,9 @@ class GenerateTestCasesAPI(APIView):
         current_level3 = None  # 三级子功能（### 开头）
         current_case = None  # 当前测试用例
         current_field = None  # 当前字段（测试场景、前置条件等）
+
+        # 支持的字段列表
+        supported_fields = ['测试场景', '前置条件', '测试步骤', '预期结果', '重要程度']
 
         for line in lines:
             stripped_line = line.strip()
@@ -204,7 +276,7 @@ class GenerateTestCasesAPI(APIView):
                 continue
 
             # 4. 识别测试用例（#### 开头）
-            if line.startswith('####') and current_level3:
+            if (line.startswith('####') or '测试ID:' in line) and current_level3:
                 # 保存上一个测试用例
                 if current_case:
                     current_level3["cases"].append(current_case)
@@ -219,9 +291,9 @@ class GenerateTestCasesAPI(APIView):
                     "重要程度": ""
                 }
 
-                # 提取测试ID
-                case_title = self._clean_text(line[4:].strip())
-                id_match = re.match(r'^测试ID:\s*([A-Za-z0-9_]+)', case_title)
+                # 提取测试ID（增强版匹配）
+                case_title = self._clean_text(line.strip())
+                id_match = re.search(r'测试ID\s*[:：]\s*([A-Za-z0-9_]+)', case_title)
                 if id_match:
                     current_case["test_id"] = id_match.group(1)
                 else:
@@ -229,32 +301,40 @@ class GenerateTestCasesAPI(APIView):
                     id_candidate = re.search(r'[A-Z]+_\d+', case_title)
                     if id_candidate:
                         current_case["test_id"] = id_candidate.group()
+                    else:
+                        # 自动生成ID
+                        case_count = len(current_level3["cases"]) + 1
+                        module_abbr = current_level3["title"][:3].upper()
+                        current_case["test_id"] = f"{module_abbr}_{case_count:03d}"
                 continue
 
             # 5. 处理测试用例字段
             if current_case:
                 # 识别字段标题（测试场景、前置条件等）
-                field_match = re.match(
-                    r'^(测试场景|前置条件|测试步骤|预期结果|重要程度)\s*[:：]\s*(.*)$',
-                    stripped_line
-                )
+                field_match = None
+                for field in supported_fields:
+                    pattern = re.compile(rf'^{field}\s*[:：]\s*(.*)$')
+                    match = pattern.match(stripped_line)
+                    if match:
+                        field_match = (field, match.group(1))
+                        break
 
                 if field_match:
-                    current_field = field_match.group(1)
-                    field_content = self._clean_text(field_match.group(2))
+                    current_field, field_content = field_match
+                    cleaned_content = self._clean_text(field_content)
 
                     # 处理有初始内容的字段
-                    if field_content:
+                    if cleaned_content:
                         if current_field in ['前置条件', '测试步骤', '预期结果']:
-                            current_case[current_field].append(field_content)
+                            current_case[current_field].append(cleaned_content)
                         else:
-                            current_case[current_field] = field_content
+                            current_case[current_field] = cleaned_content
                     continue
 
-                # 处理列表项（数字+点号开头）
-                list_item_match = re.match(r'^\d+\.\s*(.*)$', stripped_line)
+                # 处理列表项（支持数字+点号或-开头）
+                list_item_match = re.match(r'^(\d+\.|\-)\s*(.*)$', stripped_line)
                 if list_item_match and current_field in ['前置条件', '测试步骤', '预期结果']:
-                    item_content = self._clean_text(list_item_match.group(1))
+                    item_content = self._clean_text(list_item_match.group(2))
                     current_case[current_field].append(item_content)
                     continue
 
@@ -262,7 +342,11 @@ class GenerateTestCasesAPI(APIView):
                 if current_field and stripped_line:
                     cleaned_line = self._clean_text(stripped_line)
                     if current_field in ['前置条件', '测试步骤', '预期结果']:
-                        current_case[current_field].append(cleaned_line)
+                        # 如果最后一个元素存在，尝试合并
+                        if current_case[current_field]:
+                            current_case[current_field][-1] += " " + cleaned_line
+                        else:
+                            current_case[current_field].append(cleaned_line)
                     else:
                         current_case[current_field] += " " + cleaned_line
 
@@ -281,9 +365,9 @@ class GenerateTestCasesAPI(APIView):
                         "cases": [{
                             "test_id": "DEFAULT_001",
                             "测试场景": "未解析到有效测试用例",
-                            "前置条件": [],
-                            "测试步骤": [],
-                            "预期结果": [],
+                            "前置条件": ["系统正常运行"],
+                            "测试步骤": ["检查API返回格式是否正确"],
+                            "预期结果": ["返回符合要求的测试用例格式"],
                             "重要程度": "中"
                         }]
                     }]
@@ -337,7 +421,7 @@ class GenerateTestCasesAPI(APIView):
                         # 测试场景
                         if case["测试场景"]:
                             scene_node = ET.SubElement(case_node, "node")
-                            scene_node.set("TEXT", f"测试场景: {case['测试场景']}")
+                            scene_node.set("TEXT", f"测试场景: {case['测试场景']}")  # 修正属性名小写
                             scene_node.set("COLOR", "#696969")
 
                         # 前置条件
@@ -374,7 +458,9 @@ class GenerateTestCasesAPI(APIView):
                         if case["重要程度"]:
                             importance_node = ET.SubElement(case_node, "node")
                             importance_node.set("TEXT", f"重要程度: {case['重要程度']}")
-                            importance_node.set("COLOR", "#696969")
+                            # 根据重要程度设置不同颜色
+                            color_map = {"高": "#FF0000", "中": "#FFA500", "低": "#008000"}
+                            importance_node.set("COLOR", color_map.get(case["重要程度"], "#696969"))
 
         # 格式化XML
         rough_string = ET.tostring(map_root, 'utf-8')
