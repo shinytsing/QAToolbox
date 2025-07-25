@@ -7,14 +7,12 @@ from django.conf import settings
 
 def test_case_generator(request):
     """工具首页"""
-    return render(request, 'tool/test_case_generator.html')
+    return render(request, 'tools/test_case_generator.html')
 
 def download_file(request, filename):
     """文件下载视图"""
     file_path = os.path.join(settings.MEDIA_ROOT, 'tool_outputs', filename)
     return FileResponse(open(file_path, 'rb'), as_attachment=True)
-
-
 
 class CodeQualityCheckAPI(APIView):
     def post(self, request):

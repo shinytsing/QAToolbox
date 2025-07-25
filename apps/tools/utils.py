@@ -21,7 +21,7 @@ except (ValueError, KeyError):
 
 class DeepSeekClient:
     API_BASE_URL = "https://api.deepseek.com/v1/chat/completions"
-    TIMEOUT = 60  # 超时时间（秒）
+    TIMEOUT = 300   # 超时时间（秒）
 
     def __init__(self):
         self.api_key = DEEPSEEK_API_KEY

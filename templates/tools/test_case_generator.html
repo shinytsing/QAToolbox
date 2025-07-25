@@ -455,7 +455,7 @@
                     'X-CSRFToken': csrfToken,
                     'Content-Type': 'application/json'
                 },
-                timeout: 60000  // 60秒超时设置，避免无限等待
+                timeout: 6000000  // 60秒超时设置，避免无限等待
             })
             .then(response => {
                 console.log('请求成功，响应数据:', response.data);

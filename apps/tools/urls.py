@@ -1,4 +1,4 @@
-# QAToolbox/apps/tool/urls.py
+# QAToolbox/apps/tools/urls.py
 from django.urls import path
 from .views import test_case_generator, download_file
 from .api import GenerateTestCasesAPI

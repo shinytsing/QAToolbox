@@ -12,7 +12,10 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from django.conf import settings
 from django.core.files import File
+import datetime  # 顶部导入
 import logging
+import re
+from datetime import datetime
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -31,13 +34,16 @@ class GenerateTestCasesAPI(APIView):
 
     def post(self, request):
         try:
+            start_time = datetime.now()
             # 1. 获取并验证请求参数
             requirement = request.data.get('requirement', '').strip()
             user_prompt = request.data.get('prompt', '').strip()
 
-            # 日志记录请求
-            logger.info(f"用户 {request.user.username} 发起测试用例生成请求")
-
+            logger.info(
+                f"用户 {request.user.username} 发起测试用例生成请求，"
+                f"需求长度: {len(request.data.get('requirement', ''))}，"
+                f"时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
             # 验证需求参数（允许prompt为空，使用默认值）
             if not requirement:
                 logger.warning("测试用例生成请求缺少requirement参数")
@@ -93,15 +99,34 @@ class GenerateTestCasesAPI(APIView):
                 # 清理临时文件
                 os.unlink(tmp.name)
 
-            logger.info(f"用户 {request.user.username} 测试用例生成成功，文件: {log.output_file.name}")
+            # 1. 截取前10个字符（处理空字符串情况）
+            truncated_req = requirement[:10].strip() if requirement else "default"
+
+            # 2. 清理文件名中的特殊字符（移除或替换不允许的字符）
+            invalid_chars = r'[\\/*?:"<>|]'  # 操作系统不允许的文件名字符
+            cleaned_req = re.sub(invalid_chars, '_', truncated_req)
+
+            # 3. 生成 yyyy-MM-dd hh:mm:ss 格式的时间（替换冒号为合法字符）
+            current_time = datetime.now().strftime("%Y-%m-%d %H-%M-%S")  # 用 - 代替 :
+
+            # 4. 组合文件名（示例：用户登录功能_2025-07-26 14-30-45）
+            outfile_name = f"{cleaned_req}_{current_time}"
+
+            logger.info(f"用户 {request.user.username} 测试用例生成成功，文件: {outfile_name}")
             return Response({
-                'download_url': f'/tool/download/{os.path.basename(log.output_file.name)}',
+                'download_url': f'/tools/download/{outfile_name}',
                 'log_id': log.id,
                 'raw_response': raw_response
             })
 
         except Exception as e:
-            logger.error(f"测试用例生成失败: {str(e)}", exc_info=True)
+            logger.error(
+                f"用户 {request.user.username} 测试用例生成失败，"
+                f"耗时: {(datetime.now() - start_time).total_seconds()}秒，"
+                f"错误: {str(e)}",
+                exc_info=True  # 记录完整堆栈信息
+            )
+
             return Response(
                 {'error': f'服务器处理失败: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
