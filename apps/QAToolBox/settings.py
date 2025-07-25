@@ -59,7 +59,7 @@ INSTALLED_APPS = [
     # 自定义应用
     'users',
     'content',
-    'tools',
+    'tool',
 ]
 
 MIDDLEWARE = [

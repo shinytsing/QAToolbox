@@ -26,9 +26,9 @@ urlpatterns = [
     path('', home_view, name='home'),
     path('admin/', admin.site.urls),
     # 工具主页面路由
-    path('tools/', tool_view, name='tools'),
+    path('tool/', tool_view, name='tool'),
     # 工具子路由（包含测试用例生成器等）
-    path('tools/', include('apps.tools.urls')),
+    path('tool/', include('apps.tools.urls')),
     path('users/', include('apps.users.urls')),
     path('content/', include('apps.content.urls')),
     path('about/', lambda request: HttpResponse('关于页面'), name='about'),
